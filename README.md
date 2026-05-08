@@ -1,11 +1,25 @@
-<div align="center">
+# REQFLOW PRO - Offline Edition
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Digital requisition processing system with automated multi-stage approval workflows.
 
-  <h1>Built with AI Studio</h2>
+## Mock Authentication
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+This version uses local mock authentication. No external database setup is required.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+### Predefined Users
+| Username | Password | Role |
+| :--- | :--- | :--- |
+| `admin` | `password123` | System Administrator |
+| `director` | `password123` | Managing Director |
+| `finance` | `password123` | Finance HOD |
+| `ops` | `password123` | Operations Manager |
+| `requester` | `password123` | Site Requester |
 
-</div>
+## Local Persistence
+
+Data is persisted locally in your browser using **IndexedDB (via Dexie)**. Clearing your browser cache or site data will reset the application state.
+
+## Admin Panel
+
+Access the **Administrator Entrance** from the login screen.
+- **Admin Password**: `Admin50$` or `Action50$`.
