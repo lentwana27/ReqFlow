@@ -11,7 +11,7 @@ interface VerificationViewProps {
   onPublic?: boolean;
 }
 
-export default function VerificationView({ id, signatureId, onClose }: VerificationViewProps) {
+export default function VerificationView({ id, signatureId, onClose, onPublic }: VerificationViewProps) {
   const [loading, setLoading] = useState(true);
   const [requisition, setRequisition] = useState<Requisition | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -19,9 +19,8 @@ export default function VerificationView({ id, signatureId, onClose }: Verificat
   useEffect(() => {
     async function verify() {
       try {
-        // Find the requisition in the list
-        const allReqs = await requisitionService.list();
-        const data = allReqs.find((r: any) => r.id === id);
+        // Use the specific getById method
+        const data = await requisitionService.getById(id);
         
         if (data) {
           const approval = data.approvals.find((a: any) => a.signatureId === signatureId);
@@ -34,7 +33,7 @@ export default function VerificationView({ id, signatureId, onClose }: Verificat
           setError('Requisition not found.');
         }
       } catch (err) {
-        setError('Verification failed. Please try again.');
+        setError('Verification failed. Requisition may not exist.');
         console.error(err);
       } finally {
         setLoading(false);
@@ -133,7 +132,7 @@ export default function VerificationView({ id, signatureId, onClose }: Verificat
                   onClick={onClose}
                   className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-sm tracking-tight hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20 active:scale-[0.98]"
                 >
-                  Return to Main App
+                  {onPublic ? 'Close Verification' : 'Return to App'}
                 </button>
               </div>
             </div>

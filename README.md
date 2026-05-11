@@ -1,4 +1,4 @@
-# REQFLOW PRO - Offline Edition
+# REQFLOW PRO
 
 Digital requisition processing system with automated multi-stage approval workflows.
 

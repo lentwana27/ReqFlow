@@ -39,6 +39,19 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           setRequisitions(localData);
           setLoading(false);
           
+          // Auto-open requisition if passed in URL
+          const params = new URLSearchParams(window.location.search);
+          const reqId = params.get('requisitionId');
+          if (reqId && !selectedReq) {
+            const found = localData.find(r => r.id === reqId);
+            if (found) {
+              setSelectedReq(found);
+              // Clear param from URL without reloading
+              const newUrl = window.location.pathname;
+              window.history.replaceState({}, '', newUrl);
+            }
+          }
+
           // Auto-switch to Action tab if there are items needing approval
           const needsApproval = localData.filter(r => {
             const currentApproval = r.approvals[r.currentStage];
@@ -80,7 +93,14 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       req.creatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       req.items.some(item => item.description.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    const reqDate = req.createdAt ? parseISO(req.createdAt as unknown as string) : null;
+    const getReqDate = (date: any) => {
+      if (!date) return null;
+      if (typeof date === 'string') return parseISO(date);
+      if (date && typeof date === 'object' && date.seconds) return new Date(date.seconds * 1000);
+      return null;
+    };
+
+    const reqDate = getReqDate(req.createdAt);
     
     let matchesStartDate = true;
     if (filterStartDate && reqDate) {
@@ -154,38 +174,21 @@ export default function Dashboard({ userProfile }: DashboardProps) {
     if (!userProfile) return;
     try {
       // Role resolving and de-duplication
-      const rawStages = data.approvals ? data.approvals.map((a: any) => a.role) : REQUISITION_WORKFLOWS[data.type as keyof typeof REQUISITION_WORKFLOWS];
-      
-      const resolvedStages = rawStages.map((role: string) => 
-        role === 'Dept HOD' ? `${userProfile.department} HOD` : role
-      );
-
-      const uniqueStages: string[] = [];
-      resolvedStages.forEach((role: string) => {
-        if (!uniqueStages.includes(role)) uniqueStages.push(role);
-      });
-
-      const finalApprovals = uniqueStages.map(role => ({
-        role,
-        status: 'pending' as const,
-        approverId: null,
-        approverName: null,
-        timestamp: null,
-        comment: ''
-      }));
-
+      const now = new Date().toISOString();
       const requisitionData = {
         ...data,
+        id: crypto.randomUUID(),
         creatorId: userProfile.uid,
         creatorName: userProfile.name,
         department: userProfile.department,
         status: 'pending',
         currentStage: 0,
-        involvedRoles: Array.from(new Set(uniqueStages)),
-        approvals: finalApprovals,
+        involvedRoles: Array.from(new Set(data.approvals.map((a: any) => a.role))),
+        createdAt: now,
+        updatedAt: now,
       };
 
-      const newReq = await requisitionService.create(requisitionData);
+      const newReq = await requisitionService.create(requisitionData as Requisition);
       setRequisitions(prev => [newReq, ...prev]);
 
       await auditService.log({
@@ -359,7 +362,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            {[UserRole.FINANCE_HOD, UserRole.DIRECTOR, UserRole.ADMIN].includes(userProfile.role) && (
+            {[UserRole.FINANCE_HOD, UserRole.DIRECTOR, UserRole.ADMIN, UserRole.TREASURER].includes(userProfile.role) && (
               <>
                 <button 
                   onClick={handleExportPDF}
@@ -399,6 +402,11 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                 const currentApproval = req.approvals[req.currentStage];
                 const needsMyApproval = req.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
                 
+                // Extra check for Treasurer to see only Approved items in the list even if somehow they passed through filteredRequisitions
+                if (userProfile.role === UserRole.TREASURER && req.status !== 'approved' && req.status !== 'processed') {
+                  return null;
+                }
+
                 return (
                   <tr 
                     key={req.id} 
@@ -420,7 +428,15 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                     </td>
                     <td className="px-6 py-4 font-mono text-xs font-bold">${req.totalAmount.toFixed(2)}</td>
                     <td className="px-6 py-4 text-xs text-gray-500">
-                      {req.createdAt ? format(parseISO(req.createdAt as unknown as string), 'MMM dd, HH:mm') : '...'}
+                      {req.createdAt ? (
+                        (() => {
+                           try {
+                             return format(typeof req.createdAt === 'string' ? parseISO(req.createdAt) : new Date(req.createdAt as any), 'MMM dd, HH:mm');
+                           } catch (e) {
+                             return 'Invalid Date';
+                           }
+                        })()
+                      ) : '...'}
                     </td>
                     <td className="px-2 py-2">
                       <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-sm ${getStatusColor(req.status)}`}>

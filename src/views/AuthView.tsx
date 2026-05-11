@@ -28,6 +28,7 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
 
   // ─── Form fields ────────────────────────────────────────────────────────────
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetCode, setResetCode] = useState('');
@@ -38,6 +39,7 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
 
   const resetForm = () => {
     setUsername('');
+    setEmail('');
     setPassword('');
     setConfirmPassword('');
     setResetCode('');
@@ -77,6 +79,7 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
         const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
         const { user } = await authService.register({
           username: username.trim().toLowerCase(),
+          email: email.trim().toLowerCase(),
           password,
           name: fullName,
           role,
@@ -117,32 +120,28 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
           await authService.requestPasswordReset(username.trim().toLowerCase());
         } catch (_) { /* ignore if not configured */ }
 
-        setSuccess(
-          'Reset request logged. Ask your administrator to open the Admin Panel → ' +
-          'Audit & Resets tab to find your 6-digit code. Then come back and click ' +
-          '"I have a code" to set a new password.'
-        );
+        setSuccess('Reset logged. Contact Admin for your 6-digit code.');
 
-      // ── RESET PASSWORD ─────────────────────────────────────────────────────
+      // ── RESET PASSWORD (LOGIN WITH CODE) ───────────────────────────────────
       } else if (mode === 'reset') {
-        if (!username.trim() || !resetCode.trim() || !password) {
-          throw new Error('All fields are required.');
+        if (!username.trim() || !resetCode.trim()) {
+          throw new Error('Username and Code are required.');
         }
-        if (password !== confirmPassword) throw new Error('Passwords do not match.');
-        if (password.length < 6) throw new Error('Password must be at least 6 characters.');
 
-        // Log the attempt
-        await auditService.log({
-          user: 'Anonymous',
-          username: username.trim().toLowerCase(),
-          action: 'Password Change Attempt',
+        // Try to login with the code assuming the admin set it as the password
+        const { user } = await authService.login(username.trim().toLowerCase(), resetCode.trim());
+
+        // Fire-and-forget audit
+        auditService.log({
+          user: user.name,
+          username: user.username,
+          action: 'Password Reset Login',
           module: 'AUTH',
           target: 'USER',
-          details: `User submitted code ${resetCode.trim()} and requested a new password.`,
-        });
+          details: `User @${user.username} successfully logged in using a reset code.`,
+        }).catch(console.warn);
 
-        setSuccess('Request logged. Your administrator will update your password shortly.');
-        setTimeout(() => switchMode('login'), 3000);
+        onLoginSuccess(user);
       }
     } catch (err: any) {
       console.error('Auth error:', err);
@@ -162,9 +161,9 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
 
       const lowerMsg = msg.toLowerCase();
       if (lowerMsg.includes('invalid login credentials') || lowerMsg.includes('invalid credentials')) {
-        msg =
-          'Invalid username or password. If you just migrated from the old system, ' +
-          'you may need to register a new account or use the Administrator Entrance to initialize the admin account.';
+        msg = mode === 'reset' 
+          ? 'Invalid code. Please ensure your Admin has updated your password to the 6-digit code provided in the logs.'
+          : 'Invalid username or password.';
       } else if (lowerMsg.includes('already registered') || lowerMsg.includes('already exists')) {
         msg = 'That username is already taken. Please choose another or try signing in.';
       } else if (lowerMsg.includes('rate limit')) {
@@ -182,13 +181,13 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
     login: 'Welcome Back',
     signup: 'Create Account',
     forgot: 'Forgot Password',
-    reset: 'Set New Password',
+    reset: 'Login with Code',
   };
   const subtitles: Record<typeof mode, string> = {
     login: 'Sign in to manage your department requisitions.',
     signup: 'Join the system to start processing requisitions.',
     forgot: 'Enter your username to request a reset code from your admin.',
-    reset: 'Enter the 6-digit code from your admin and choose a new password.',
+    reset: 'Enter the 6-digit code from your admin to access your account.',
   };
 
   return (
@@ -211,11 +210,6 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
           <div className="mb-8">
             <h2 className="text-xl font-bold mb-1">{titles[mode]}</h2>
             <p className="text-gray-500 text-sm">{subtitles[mode]}</p>
-            {mode === 'login' && (
-              <p className="text-[10px] text-gray-400 mt-2">
-                Hint: Use <span className="font-bold">admin</span> / <span className="font-bold">password123</span> for testing.
-              </p>
-            )}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -278,6 +272,20 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
                   className="w-full border border-gray-200 pl-10 pr-4 py-2.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-black text-sm"
                 />
               </div>
+
+              {mode === 'signup' && (
+                <div className="relative">
+                  <UserIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    placeholder="Personal Email Address"
+                    required
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    className="w-full border border-gray-200 pl-10 pr-4 py-2.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-black text-sm"
+                  />
+                </div>
+              )}
 
               {mode === 'reset' && (
                 <div className="relative">
@@ -344,11 +352,27 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
               </button>
 
               {mode === 'login' && (
+                <div className="flex flex-col items-end gap-2">
+                  <button
+                    onClick={() => switchMode('forgot')}
+                    className="text-xs font-bold text-black border-b border-black pb-0.5"
+                  >
+                    Forgot Password?
+                  </button>
+                  <button
+                    onClick={() => switchMode('reset')}
+                    className="text-[10px] font-bold text-gray-400 hover:text-black uppercase tracking-wider"
+                  >
+                    I have a code
+                  </button>
+                </div>
+              )}
+              {mode === 'forgot' && (
                 <button
-                  onClick={() => switchMode('forgot')}
+                  onClick={() => switchMode('reset')}
                   className="text-xs font-bold text-black border-b border-black pb-0.5"
                 >
-                  Forgot Password?
+                  I have a code
                 </button>
               )}
             </div>

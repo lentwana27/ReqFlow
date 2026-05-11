@@ -12,6 +12,7 @@ export enum RequisitionType {
 
 export enum UserRole {
   REQUESTER = 'Requester',
+  HOD = 'Head of Department',
   PURCHASING_HOD = 'Purchasing HOD',
   FINANCE_HOD = 'Finance HOD',
   OPERATIONS_MANAGER = 'Operations Manager',
@@ -19,7 +20,8 @@ export enum UserRole {
   ADMIN = 'System Administrator',
   SHOP_SUPERVISOR = 'Shop Supervisor',
   IT_HOD = 'IT HOD',
-  WAREHOUSE_HOD = 'Warehouse HOD'
+  WAREHOUSE_HOD = 'Warehouse HOD',
+  TREASURER = 'Treasurer'
 }
 
 export enum Department {
@@ -29,7 +31,9 @@ export enum Department {
   GENERAL = 'General',
   OPERATIONS = 'Operations',
   WAREHOUSE = 'Warehouse',
-  SHOP = 'Shop'
+  SHOP = 'Shop',
+  WORKSHOP = 'Workshop',
+  FUEL = 'Fuel'
 }
 
 export interface RequisitionItem {
@@ -82,43 +86,42 @@ export interface UserProfile {
 
 export interface ActivityLog {
   id: string;
-  requisitionId: string;
-  requisitionNumber?: string;
-  userId: string;
-  userName: string;
-  action: string;
-  details: string;
   timestamp: any;
+  user: string;
+  username: string;
+  action: string;
+  module: string;
+  target?: string;
+  details?: string;
+  requisitionId?: string;
+  userId?: string;
 }
 
 // Workflow definitions based on specific department types
 export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
   [RequisitionType.PURCHASING]: [
-    UserRole.PURCHASING_HOD,
+    UserRole.HOD, // Dept HOD first
     UserRole.FINANCE_HOD,
     UserRole.DIRECTOR
   ],
-  [RequisitionType.ADMIN]: [ // Using as Operations / Other for context
+  [RequisitionType.ADMIN]: [
     UserRole.OPERATIONS_MANAGER,
-    UserRole.PURCHASING_HOD,
     UserRole.FINANCE_HOD,
     UserRole.DIRECTOR
   ],
   [RequisitionType.WAREHOUSE]: [
+    UserRole.HOD,
     UserRole.OPERATIONS_MANAGER,
-    UserRole.PURCHASING_HOD,
-    UserRole.FINANCE_HOD,
-    UserRole.DIRECTOR
+    UserRole.FINANCE_HOD
   ],
   [RequisitionType.FUEL]: [
-    UserRole.FINANCE_HOD,
-    UserRole.DIRECTOR
+    UserRole.HOD,
+    UserRole.FINANCE_HOD
   ],
   [RequisitionType.SHOP_USE]: [
+    UserRole.SHOP_SUPERVISOR,
     UserRole.OPERATIONS_MANAGER,
-    UserRole.PURCHASING_HOD,
-    UserRole.FINANCE_HOD,
-    UserRole.DIRECTOR
+    UserRole.FINANCE_HOD
   ],
   [RequisitionType.SHOP_QR]: [
     UserRole.SHOP_SUPERVISOR,
@@ -129,7 +132,7 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
     UserRole.IT_HOD
   ],
   [RequisitionType.WORKSHOP]: [
-    UserRole.PURCHASING_HOD,
+    UserRole.HOD,
     UserRole.FINANCE_HOD,
     UserRole.DIRECTOR
   ],

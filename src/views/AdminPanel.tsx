@@ -253,8 +253,7 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
           </div>
           <h2 className="text-xl font-bold mb-1">Admin Panel</h2>
           <p className="text-gray-500 text-sm mb-6">
-            Enter the administrator password to access system controls.<br/>
-            (Default: <span className="font-mono bg-gray-100 px-1">Admin50$</span>)
+            Enter the administrator password to access system controls.
           </p>
 
           <form onSubmit={handleUnlock} className="space-y-4">
@@ -697,9 +696,14 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
                       Password Reset Requests ({resetRequests.length})
                     </h3>
                   </div>
-                  <p className="text-xs text-amber-700 mt-1">
-                    Share the code below with the user so they can log in and change their password.
-                  </p>
+                  <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-sm">
+                    <p className="text-[10px] text-amber-800 font-bold uppercase mb-1">Administrator Instruction:</p>
+                    <p className="text-[11px] text-amber-700 leading-relaxed font-medium">
+                      1. Open the Supabase Auth Console.<br/>
+                      2. Locate the user and <span className="underline font-bold">set their password manually</span> to the 6-digit code shown below.<br/>
+                      3. Once set, the user can log in with that code and change their password in their profile settings.
+                    </p>
+                  </div>
                 </div>
                 <div className="divide-y divide-amber-100">
                   {resetRequests.map((log) => (

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, X, Loader2 } from 'lucide-react';
-import { RequisitionType, RequisitionItem, Department, REQUISITION_WORKFLOWS } from '../../types';
+import { RequisitionType, RequisitionItem, Department, REQUISITION_WORKFLOWS, UserRole } from '../../types';
 import { motion } from 'motion/react';
 
 interface RequisitionFormProps {
@@ -13,7 +13,7 @@ interface RequisitionFormProps {
 export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail }: RequisitionFormProps) {
   const [type, setType] = useState<RequisitionType>(RequisitionType.ADMIN);
   const [writtenTo, setWrittenTo] = useState('');
-  const [adminFirstStep, setAdminFirstStep] = useState<'Purchasing HOD' | 'Operations HOD'>('Purchasing HOD');
+  const [adminFirstStep, setAdminFirstStep] = useState<UserRole>(UserRole.PURCHASING_HOD);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [items, setItems] = useState<RequisitionItem[]>([
     { description: '', qty: 1, unitCost: 0, totalCost: 0 }
@@ -57,6 +57,11 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
     try {
       const workflowStages = [...REQUISITION_WORKFLOWS[type]];
       
+      // Customize first step for Admin type if needed
+      if (type === RequisitionType.ADMIN && workflowStages.length > 0) {
+        workflowStages[0] = adminFirstStep;
+      }
+
       const initialApprovals = workflowStages.map(role => ({
         role,
         status: 'pending' as const,
@@ -156,18 +161,18 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                   <div className="flex bg-white p-1 rounded-sm border border-gray-200">
                     <button
                       type="button"
-                      onClick={() => setAdminFirstStep('Purchasing HOD')}
+                      onClick={() => setAdminFirstStep(UserRole.PURCHASING_HOD)}
                       className={`text-[9px] px-2 py-1 rounded-sm uppercase font-bold transition-colors ${
-                        adminFirstStep === 'Purchasing HOD' ? 'bg-black text-white' : 'text-gray-400 hover:text-black'
+                        adminFirstStep === UserRole.PURCHASING_HOD ? 'bg-black text-white' : 'text-gray-400 hover:text-black'
                       }`}
                     >
                       Purchasing
                     </button>
                     <button
                       type="button"
-                      onClick={() => setAdminFirstStep('Operations HOD')}
+                      onClick={() => setAdminFirstStep(UserRole.OPERATIONS_MANAGER)}
                       className={`text-[9px] px-2 py-1 rounded-sm uppercase font-bold transition-colors ${
-                        adminFirstStep === 'Operations HOD' ? 'bg-black text-white' : 'text-gray-400 hover:text-black'
+                        adminFirstStep === UserRole.OPERATIONS_MANAGER ? 'bg-black text-white' : 'text-gray-400 hover:text-black'
                       }`}
                     >
                       Operations
@@ -178,19 +183,22 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
               <div className="space-y-3">
                 {(() => {
                   let workflow = [...REQUISITION_WORKFLOWS[type]];
-                  const resolvedDeptHOD = `${userDept} HOD`;
-                  workflow = workflow.map(s => s === 'Dept HOD' ? resolvedDeptHOD : s);
                   
-                  if (type === RequisitionType.ADMIN) {
+                  if (type === RequisitionType.ADMIN && workflow.length > 0) {
                     workflow[0] = adminFirstStep;
                   }
 
-                  const uniqueStages: string[] = [];
-                  workflow.forEach(s => {
-                    if (!uniqueStages.includes(s)) uniqueStages.push(s);
+                  // Resolve HOD to specific department role if needed
+                  workflow = workflow.map(role => {
+                    if (role === UserRole.HOD) {
+                      if (userDept === Department.IT) return UserRole.IT_HOD;
+                      if (userDept === Department.WAREHOUSE) return UserRole.WAREHOUSE_HOD;
+                      return `HOD (${userDept})`;
+                    }
+                    return role;
                   });
 
-                  return uniqueStages.map((stage, idx) => (
+                  return workflow.map((stage, idx) => (
                     <div key={idx} className="flex items-center gap-3">
                       <div className="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center text-[10px] font-mono shrink-0">
                         {idx + 1}

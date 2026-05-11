@@ -283,7 +283,18 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
             <div className="text-right space-y-4">
               <div>
                 <label className="input-label">Date Submitted</label>
-                <p className="text-sm font-mono">{requisition.createdAt ? format(parseISO(requisition.createdAt as unknown as string), 'PPP p') : '...'}</p>
+                <p className="text-sm font-mono">
+                  {requisition.createdAt ? (
+                    (() => {
+                      try {
+                        const d = typeof requisition.createdAt === 'string' ? parseISO(requisition.createdAt) : new Date(requisition.createdAt as any);
+                        return format(d, 'PPP p');
+                      } catch (e) {
+                         return 'Invalid Date';
+                      }
+                    })()
+                  ) : '...'}
+                </p>
                 <div className={`inline-block mt-2 px-3 py-1 rounded-sm text-[10px] font-bold uppercase ${
                   requisition.status === 'approved' ? 'bg-blue-100 text-blue-700' :
                   requisition.status === 'processed' ? 'bg-green-100 text-green-700' :
@@ -355,18 +366,31 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-bold uppercase tracking-tight">{approval.role}</p>
                         {approval.signatureId && (
-                          <div className="p-1 bg-white border border-gray-200 rounded-sm shadow-sm hover:scale-150 transition-transform cursor-pointer origin-left bg-white z-20">
-                            <QRCodeCanvas 
-                              value={`${getPublicOrigin()}?verify=${approval.signatureId}&reqId=${requisition.id}`} 
-                              size={20}
-                              level="L"
-                            />
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="p-1.5 bg-white border border-gray-200 rounded-sm shadow-sm hover:scale-[2] transition-transform cursor-pointer origin-left z-20"
+                              title="Scan to verify authorization"
+                            >
+                              <QRCodeCanvas 
+                                value={`${getPublicOrigin()}?verify=${approval.signatureId}&reqId=${requisition.id}`} 
+                                size={40}
+                                level="M"
+                              />
+                            </div>
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter hidden sm:inline">Scan to Verify</span>
                           </div>
                         )}
                       </div>
                       {approval.timestamp && (
                         <span className="text-[10px] font-mono text-gray-400">
-                            {format(parseISO(approval.timestamp), 'MMM dd, HH:mm')}
+                          {(() => {
+                            try {
+                              const d = typeof approval.timestamp === 'string' ? parseISO(approval.timestamp) : new Date(approval.timestamp as any);
+                              return format(d, 'MMM dd, HH:mm');
+                            } catch (e) {
+                              return 'Invalid Date';
+                            }
+                          })()}
                         </span>
                       )}
                     </div>
