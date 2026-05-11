@@ -4,6 +4,7 @@ import { UserProfile, UserRole, Department, ROLES, DEPARTMENTS } from '../types'
 import {
   Users, CheckCircle2, XCircle, Search, Loader2,
   Lock, ArrowLeft, AlertCircle, RefreshCw, KeyRound,
+  Download, Calendar, Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from '../context/ToastContext';
@@ -23,6 +24,12 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'unverified' | 'verified'>('all');
   const [activeTab, setActiveTab] = useState<'users' | 'requisitions' | 'audit'>('users');
   const [requisitions, setRequisitions] = useState<any[]>([]);
+
+  // Requisition Filters
+  const [reqSearchTerm, setReqSearchTerm] = useState('');
+  const [reqStatusFilter, setReqStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'processed'>('all');
+  const [reqDateFilter, setReqDateFilter] = useState('');
+
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [updatingUids, setUpdatingUids] = useState<string[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -233,6 +240,60 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
     return matchesSearch && matchesFilter;
   });
 
+  // ─── Filtered Requisitions ──────────────────────────────────────────────────
+
+  const filteredRequisitions = requisitions.filter((req) => {
+    const searchLower = reqSearchTerm.toLowerCase();
+    const idMatches = (req.requisitionNumber || req.id || '').toLowerCase().includes(searchLower);
+    const typeMatches = (req.type || '').toLowerCase().includes(searchLower);
+    const creatorMatches = (req.creatorName || '').toLowerCase().includes(searchLower);
+    
+    const matchesSearch = idMatches || typeMatches || creatorMatches;
+    
+    const matchesStatus = reqStatusFilter === 'all' || req.status === reqStatusFilter;
+    
+    const matchesDate = !reqDateFilter || (req.createdAt && new Date(req.createdAt).toISOString().split('T')[0] === reqDateFilter);
+    
+    return matchesSearch && matchesStatus && matchesDate;
+  });
+
+  const handleDownloadAll = () => {
+    const dataToDownload = filteredRequisitions.length > 0 ? filteredRequisitions : requisitions;
+    if (dataToDownload.length === 0) return;
+
+    const headers = ['ID', 'Number', 'Type', 'Creator', 'Department', 'Total', 'Status', 'Date'];
+    const rows = dataToDownload.map(req => [
+      req.id,
+      req.requisitionNumber || 'N/A',
+      req.type,
+      req.creatorName,
+      req.department,
+      req.totalAmount,
+      req.status,
+      req.createdAt ? new Date(req.createdAt).toLocaleDateString() : 'N/A'
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const filename = filteredRequisitions.length === requisitions.length 
+      ? `all_requisitions_${new Date().toISOString().split('T')[0]}.csv`
+      : `filtered_requisitions_${new Date().toISOString().split('T')[0]}.csv`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`${dataToDownload.length} records exported`);
+  };
+
   // ─── Reset Logs (from audit) ─────────────────────────────────────────────────
 
   const resetRequests = auditLogs.filter((l) => l.action === 'Password Reset Request');
@@ -409,6 +470,53 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
                 <option value="pending">Pending</option>
               </select>
             </>
+          )}
+
+          {/* Requisition search/filter/download */}
+          {activeTab === 'requisitions' && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search requisitions..."
+                  value={reqSearchTerm}
+                  onChange={(e) => setReqSearchTerm(e.target.value)}
+                  className="pl-9 pr-4 py-2 border border-gray-200 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-black w-44"
+                />
+              </div>
+              
+              <div className="relative">
+                <Calendar className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="date"
+                  value={reqDateFilter}
+                  onChange={(e) => setReqDateFilter(e.target.value)}
+                  className="pl-9 pr-4 py-2 border border-gray-200 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-black bg-white"
+                />
+              </div>
+
+              <select
+                value={reqStatusFilter}
+                onChange={(e) => setReqStatusFilter(e.target.value as any)}
+                className="border border-gray-200 rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-black bg-white font-bold"
+              >
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="processed">Processed</option>
+              </select>
+
+              <button
+                onClick={handleDownloadAll}
+                className="flex items-center gap-2 px-3 py-2 bg-black text-white text-xs font-bold rounded-sm hover:bg-gray-800 transition-colors"
+                title="Download All Requisitions as CSV"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Export CSV</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -622,12 +730,14 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {requisitions.map((req) => (
+                  {filteredRequisitions.map((req) => (
                     <tr key={req.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-6 py-4">
-                        <p className="font-bold text-sm font-mono truncate max-w-[180px]">{req.id}</p>
-                        <p className="text-xs text-gray-400">
-                          {req.type === 'Quotations' ? req.type : `${req.type} Requisition`}
+                        <p className="font-bold text-sm font-mono truncate max-w-[180px]">
+                          {req.requisitionNumber || req.id}
+                        </p>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold">
+                          {req.type} • {req.creatorName}
                         </p>
                       </td>
                       <td className="px-6 py-4 font-bold text-sm">

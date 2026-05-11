@@ -434,13 +434,16 @@ export const notificationService = {
       
       if (nextRole === UserRole.HOD) {
         if (requisition.department === Department.IT) {
-          query = query.eq('role', UserRole.IT_HOD);
+          query = query.or(`role.eq.${UserRole.HOD},role.eq.${UserRole.IT_HOD}`).eq('department', Department.IT);
         } else if (requisition.department === Department.WAREHOUSE) {
-          // If Warehouse also has a specific role, use it
           query = query.or(`role.eq.${UserRole.HOD},role.eq.${UserRole.WAREHOUSE_HOD}`).eq('department', Department.WAREHOUSE);
         } else {
           query = query.eq('role', UserRole.HOD).eq('department', requisition.department);
         }
+      } else if (nextRole === UserRole.IT_HOD) {
+        query = query.or(`role.eq.${UserRole.HOD},role.eq.${UserRole.IT_HOD}`).eq('department', Department.IT);
+      } else if (nextRole === UserRole.WAREHOUSE_HOD) {
+        query = query.or(`role.eq.${UserRole.HOD},role.eq.${UserRole.WAREHOUSE_HOD}`).eq('department', Department.WAREHOUSE);
       } else {
         query = query.eq('role', nextRole);
       }

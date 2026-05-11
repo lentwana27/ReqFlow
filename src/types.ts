@@ -105,18 +105,19 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
     UserRole.DIRECTOR
   ],
   [RequisitionType.ADMIN]: [
-    UserRole.OPERATIONS_MANAGER,
+    UserRole.PURCHASING_HOD,
     UserRole.FINANCE_HOD,
     UserRole.DIRECTOR
   ],
   [RequisitionType.WAREHOUSE]: [
-    UserRole.HOD,
+    UserRole.WAREHOUSE_HOD,
+    UserRole.PURCHASING_HOD,
     UserRole.OPERATIONS_MANAGER,
     UserRole.FINANCE_HOD
   ],
   [RequisitionType.FUEL]: [
-    UserRole.HOD,
-    UserRole.FINANCE_HOD
+    UserRole.FINANCE_HOD,
+    UserRole.DIRECTOR
   ],
   [RequisitionType.SHOP_USE]: [
     UserRole.SHOP_SUPERVISOR,
@@ -132,7 +133,7 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
     UserRole.IT_HOD
   ],
   [RequisitionType.WORKSHOP]: [
-    UserRole.HOD,
+    UserRole.PURCHASING_HOD,
     UserRole.FINANCE_HOD,
     UserRole.DIRECTOR
   ],

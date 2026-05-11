@@ -12,8 +12,8 @@ interface RequisitionFormProps {
 
 export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail }: RequisitionFormProps) {
   const [type, setType] = useState<RequisitionType>(RequisitionType.ADMIN);
+  const [adminInitialStep, setAdminInitialStep] = useState<UserRole>(UserRole.PURCHASING_HOD);
   const [writtenTo, setWrittenTo] = useState('');
-  const [adminFirstStep, setAdminFirstStep] = useState<UserRole>(UserRole.PURCHASING_HOD);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [items, setItems] = useState<RequisitionItem[]>([
     { description: '', qty: 1, unitCost: 0, totalCost: 0 }
@@ -55,12 +55,22 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
 
     setIsSubmitting(true);
     try {
-      const workflowStages = [...REQUISITION_WORKFLOWS[type]];
+      let workflowStages = [...REQUISITION_WORKFLOWS[type]];
       
-      // Customize first step for Admin type if needed
+      // Customize initial step for Admin type if requested
       if (type === RequisitionType.ADMIN && workflowStages.length > 0) {
-        workflowStages[0] = adminFirstStep;
+        workflowStages[0] = adminInitialStep;
       }
+      
+      // Resolve HOD to specific department role if needed
+      workflowStages = workflowStages.map(role => {
+        if (role === UserRole.HOD) {
+          if (userDept === Department.IT) return UserRole.IT_HOD;
+          if (userDept === Department.WAREHOUSE) return UserRole.WAREHOUSE_HOD;
+          return UserRole.HOD;
+        }
+        return role;
+      });
 
       const initialApprovals = workflowStages.map(role => ({
         role,
@@ -161,18 +171,18 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                   <div className="flex bg-white p-1 rounded-sm border border-gray-200">
                     <button
                       type="button"
-                      onClick={() => setAdminFirstStep(UserRole.PURCHASING_HOD)}
+                      onClick={() => setAdminInitialStep(UserRole.PURCHASING_HOD)}
                       className={`text-[9px] px-2 py-1 rounded-sm uppercase font-bold transition-colors ${
-                        adminFirstStep === UserRole.PURCHASING_HOD ? 'bg-black text-white' : 'text-gray-400 hover:text-black'
+                        adminInitialStep === UserRole.PURCHASING_HOD ? 'bg-black text-white' : 'text-gray-400 hover:text-black'
                       }`}
                     >
                       Purchasing
                     </button>
                     <button
                       type="button"
-                      onClick={() => setAdminFirstStep(UserRole.OPERATIONS_MANAGER)}
+                      onClick={() => setAdminInitialStep(UserRole.OPERATIONS_MANAGER)}
                       className={`text-[9px] px-2 py-1 rounded-sm uppercase font-bold transition-colors ${
-                        adminFirstStep === UserRole.OPERATIONS_MANAGER ? 'bg-black text-white' : 'text-gray-400 hover:text-black'
+                        adminInitialStep === UserRole.OPERATIONS_MANAGER ? 'bg-black text-white' : 'text-gray-400 hover:text-black'
                       }`}
                     >
                       Operations
@@ -185,7 +195,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                   let workflow = [...REQUISITION_WORKFLOWS[type]];
                   
                   if (type === RequisitionType.ADMIN && workflow.length > 0) {
-                    workflow[0] = adminFirstStep;
+                    workflow[0] = adminInitialStep;
                   }
 
                   // Resolve HOD to specific department role if needed
