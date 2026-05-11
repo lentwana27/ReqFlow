@@ -36,12 +36,16 @@ export const authService = {
 
       // If it doesn't look like an email, try to resolve from profile
       if (!input.includes('@')) {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileFetchError } = await supabase
           .from('profiles')
-          .select('email')
+          .select('email, status')
           .eq('username', input.toLowerCase())
           .single();
         
+        if (profileFetchError && profileFetchError.code === 'PGRST116') {
+          throw new Error('Username not found. If the system was recently reset, please Register your account again.');
+        }
+
         if (profile?.email) {
           email = profile.email;
         } else {
@@ -287,6 +291,20 @@ export const userService = {
       console.error('Delete user error:', error);
       throw error;
     }
+  },
+  resetPassword: async (uid: string, newPassword: string) => {
+    const response = await fetch('/api/admin/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: uid, newPassword })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to reset password');
+    }
+    
+    return response.json();
   }
 };
 

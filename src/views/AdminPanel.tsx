@@ -206,21 +206,45 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
   // ─── Password Reset (for user who forgot) ───────────────────────────────────
 
   const handleAdminPasswordReset = async (user: UserProfile) => {
-    const newPass = prompt(`Set a temporary password for ${user.name} (min 6 characters):`);
+    // 1. Try to find the code if it exists in audit logs
+    let currentLogs = auditLogs;
+    if (currentLogs.length === 0) {
+      try {
+        currentLogs = await auditService.list();
+        setAuditLogs(currentLogs);
+      } catch (e) {
+        console.warn('Could not fetch audit logs for reset code lookup:', e);
+      }
+    }
+
+    const existingLog = currentLogs.find(l => l.action === 'Password Reset Request' && l.username === user.username);
+    const suggestedCode = existingLog ? existingLog.details?.split('Code: ')[1] : Math.floor(100000 + Math.random() * 900000).toString();
+
+    const newPass = prompt(`Reset password for ${user.name}. Entering a custom password here will update the account immediately:`, suggestedCode || '');
     if (!newPass || newPass.length < 6) return;
 
     try {
+      setUpdatingUids(prev => [...prev, user.uid]);
+      
+      // Call automated reset
+      await userService.resetPassword(user.uid, newPass);
+
       await auditService.log({
         user: userProfile?.name || 'Admin',
         username: userProfile?.username || 'admin',
         action: 'Force Password Reset',
         module: 'USERS',
         target: user.username,
-        details: `Admin set temporary password for @${user.username}. User must change on next login.`,
+        details: `Admin reset password for @${user.username} to: ${newPass}`,
       });
-      showToast('Password reset logged. Note: Administrator must change the password in the Firebase Console.');
-    } catch (e) {
-      console.error(e);
+      
+      showToast(`Password successfully reset for ${user.name}`);
+      fetchData('audit'); // refresh logs
+    } catch (err: any) {
+      console.error('Password reset failed:', err);
+      showToast(err.message || 'Failed to reset password. Check if Service Role Key is configured.', 'error');
+    } finally {
+      setUpdatingUids(prev => prev.filter(id => id !== user.uid));
     }
   };
 
@@ -809,9 +833,10 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
                   <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-sm">
                     <p className="text-[10px] text-amber-800 font-bold uppercase mb-1">Administrator Instruction:</p>
                     <p className="text-[11px] text-amber-700 leading-relaxed font-medium">
-                      1. Open the Supabase Auth Console.<br/>
-                      2. Locate the user and <span className="underline font-bold">set their password manually</span> to the 6-digit code shown below.<br/>
-                      3. Once set, the user can log in with that code and change their password in their profile settings.
+                      1. Review the reset request and the 6-digit code below.<br/>
+                      2. Locate the user in the "Users" tab and click the <span className="font-bold underline">Key icon</span>.<br/>
+                      3. Confirm the automated reset. This updates the account password to the code.<br/>
+                      4. The user can then use that code to log in and set a permanent password.
                     </p>
                   </div>
                 </div>

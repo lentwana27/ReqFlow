@@ -24,7 +24,9 @@ export default function VerificationView({ id, signatureId, onClose, onPublic }:
         
         if (data) {
           const approval = data.approvals.find((a: any) => a.signatureId === signatureId);
-          if (approval) {
+          const isIssuedSig = data.issuedInfo?.signatureId === signatureId;
+          
+          if (approval || isIssuedSig) {
             setRequisition(data);
           } else {
             setError('Invalid digital signature for this requisition.');
@@ -114,16 +116,33 @@ export default function VerificationView({ id, signatureId, onClose, onPublic }:
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Verification Authority</p>
                 <div className="mt-2 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
-                  <p className="text-sm font-bold text-blue-900">
-                    {requisition.approvals.find(a => a.signatureId === signatureId)?.role}
-                  </p>
-                  <p className="text-[11px] text-blue-700 mt-1 font-medium">
-                    Verified Signature of {requisition.approvals.find(a => a.signatureId === signatureId)?.approverName}
-                  </p>
-                  <p className="text-[10px] text-gray-500 mt-2 font-mono font-bold flex items-center gap-1.5">
-                    <Clock className="w-3 h-3" />
-                    {requisition.approvals.find(a => a.signatureId === signatureId)?.timestamp ? format(parseISO(requisition.approvals.find(a => a.signatureId === signatureId)!.timestamp), 'PPP p') : 'N/A'}
-                  </p>
+                  {requisition.issuedInfo?.signatureId === signatureId ? (
+                    <>
+                      <p className="text-sm font-bold text-blue-900">
+                        TREASURY / CASH DISBURSEMENT
+                      </p>
+                      <p className="text-[11px] text-blue-700 mt-1 font-medium">
+                        Verified Issuance by {requisition.issuedInfo.userName}
+                      </p>
+                      <p className="text-[10px] text-gray-500 mt-2 font-mono font-bold flex items-center gap-1.5">
+                        <Clock className="w-3 h-3" />
+                        {format(parseISO(requisition.issuedInfo.timestamp), 'PPP p')}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-bold text-blue-900">
+                        {requisition.approvals.find(a => a.signatureId === signatureId)?.role}
+                      </p>
+                      <p className="text-[11px] text-blue-700 mt-1 font-medium">
+                        Verified Signature of {requisition.approvals.find(a => a.signatureId === signatureId)?.approverName}
+                      </p>
+                      <p className="text-[10px] text-gray-500 mt-2 font-mono font-bold flex items-center gap-1.5">
+                        <Clock className="w-3 h-3" />
+                        {requisition.approvals.find(a => a.signatureId === signatureId)?.timestamp ? format(parseISO(requisition.approvals.find(a => a.signatureId === signatureId)!.timestamp), 'PPP p') : 'N/A'}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
 

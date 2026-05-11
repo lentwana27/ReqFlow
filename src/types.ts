@@ -53,6 +53,13 @@ export interface Approval {
   signatureId?: string;
 }
 
+export interface IssuedInfo {
+  userId: string;
+  userName: string;
+  timestamp: any;
+  signatureId: string;
+}
+
 export interface Requisition {
   id: string;
   requisitionNumber: string;
@@ -68,6 +75,7 @@ export interface Requisition {
   currentStage: number;
   involvedRoles: string[];
   approvals: Approval[];
+  issuedInfo?: IssuedInfo;
   createdAt: any;
   updatedAt: any;
 }
@@ -81,6 +89,7 @@ export interface UserProfile {
   department: Department;
   status: 'pending' | 'approved';
   isVerified: boolean;
+  resetCode?: string;
   createdAt: any;
 }
 

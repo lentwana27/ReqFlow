@@ -117,6 +117,44 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
       }
     },
   });
+  
+  // Disbursement Section (if exists)
+  if (requisition.status === 'processed' && requisition.issuedInfo) {
+    const nextY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(11);
+    doc.setTextColor(0, 50, 150);
+    doc.setFont('', 'bold');
+    doc.text('DISBURSEMENT / ISSUANCE DETAILS', 14, nextY);
+    
+    doc.setFontSize(9);
+    doc.setTextColor(26, 26, 26);
+    doc.setFont('', 'normal');
+    
+    const issuedDate = typeof requisition.issuedInfo.timestamp === 'string' ? parseISO(requisition.issuedInfo.timestamp) : new Date(requisition.issuedInfo.timestamp);
+    
+    doc.setFont('', 'bold');
+    doc.text('Issued By:', 14, nextY + 7);
+    doc.setFont('', 'normal');
+    doc.text(requisition.issuedInfo.userName, 45, nextY + 7);
+    
+    doc.setFont('', 'bold');
+    doc.text('Issue Date:', 14, nextY + 13);
+    doc.setFont('', 'normal');
+    doc.text(format(issuedDate, 'PPP p'), 45, nextY + 13);
+    
+    doc.setFont('', 'bold');
+    doc.text('Signature ID:', 14, nextY + 19);
+    doc.setFont('', 'normal');
+    doc.text(requisition.issuedInfo.signatureId, 45, nextY + 19);
+
+    // QR Code for Issuance
+    const verifyUrl = `${getPublicOrigin()}/?verify=${requisition.issuedInfo.signatureId}&reqId=${requisition.id}`;
+    const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 100 });
+    doc.addImage(qrDataUrl, 'PNG', pageWidth - 45, nextY + 2, 25, 25);
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.text('Scan to verify disbursement', pageWidth - 32.5, nextY + 29, { align: 'center' });
+  }
 
   // Footer / Verification note
   const pageHeight = doc.internal.pageSize.height;

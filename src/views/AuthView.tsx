@@ -115,32 +115,45 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
           details: `User requested password reset. Code: ${code}`,
         });
 
-        // 3. Optional: call Supabase reset method
+        // 3. Optional: call Supabase reset method (standard flow)
         try {
           await authService.requestPasswordReset(username.trim().toLowerCase());
         } catch (_) { /* ignore if not configured */ }
 
-        setSuccess('Reset logged. Contact Admin for your 6-digit code.');
+        setSuccess(`Reset request logged. YOUR CODE: ${code}. Please provide this code to your Admin to authorize your access.`);
 
       // ── RESET PASSWORD (LOGIN WITH CODE) ───────────────────────────────────
       } else if (mode === 'reset') {
         if (!username.trim() || !resetCode.trim()) {
           throw new Error('Username and Code are required.');
         }
+        if (password.length < 6) {
+          throw new Error('New password must be at least 6 characters.');
+        }
 
-        // Try to login with the code assuming the admin set it as the password
+        // 1. Try to login with the code assuming the admin set it as the password
         const { user } = await authService.login(username.trim().toLowerCase(), resetCode.trim());
+
+        // 2. Immediately update to the new permanent password
+        try {
+          await authService.changePassword(password);
+        } catch (updateErr) {
+          console.warn('Password update after code login failed:', updateErr);
+          // We still let them in, but warn them
+          setSuccess('Logged in with code, but permanent password update failed. Please update it manually in Profile.');
+        }
 
         // Fire-and-forget audit
         auditService.log({
           user: user.name,
           username: user.username,
-          action: 'Password Reset Login',
+          action: 'Password reset completed',
           module: 'AUTH',
           target: 'USER',
-          details: `User @${user.username} successfully logged in using a reset code.`,
+          details: `User @${user.username} logged in with code and set a new password.`,
         }).catch(console.warn);
 
+        if (!success) setSuccess('Password updated successfully. Logging you in...');
         onLoginSuccess(user);
       }
     } catch (err: any) {
@@ -166,8 +179,8 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
       
       if (isGeneric) {
         msg = mode === 'reset' 
-          ? 'Invalid code. Please ensure your Admin has updated your password to the 6-digit code provided in the logs.'
-          : 'Invalid username or password. (Check your credentials or verify if you need to re-register after a backend change).';
+          ? 'Invalid code or username. If you just requested a reset, please wait for an administrator to approve it.'
+          : 'Invalid username or password. Check your credentials or contact an admin.';
       } else if (lowerMsg.includes('already registered') || lowerMsg.includes('already exists')) {
         msg = 'That username or email is already taken. Please choose another or try signing in.';
       } else if (lowerMsg.includes('rate limit')) {

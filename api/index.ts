@@ -3,6 +3,7 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Resend } from 'resend';
+import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +18,40 @@ async function configureServer() {
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', service: 'REQFLOW PRO' });
+  });
+
+  // Admin Password Reset
+  app.post('/api/admin/reset-password', async (req, res) => {
+    const { userId, newPassword } = req.body;
+    const url = process.env.VITE_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !serviceRoleKey) {
+      console.warn('[Admin Auth] SUPABASE_SERVICE_ROLE_KEY missing. Admin password reset unavailable.');
+      return res.status(503).json({ 
+        error: 'System not configured for automated password resets.',
+        hint: 'Please provide SUPABASE_SERVICE_ROLE_KEY in the application settings.'
+      });
+    }
+
+    try {
+      // Use service role key to bypass RLS and perform admin actions
+      const supabaseAdmin = createClient(url, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+      });
+
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password: newPassword
+      });
+
+      if (error) throw error;
+
+      console.log(`[Admin Auth] Password successfully reset for user: ${userId}`);
+      res.json({ success: true, message: 'Password updated successfully' });
+    } catch (err: any) {
+      console.error('[Admin Auth] Reset password error:', err);
+      res.status(500).json({ error: err.message || 'Failed to update password' });
+    }
   });
 
   // Notification endpoint

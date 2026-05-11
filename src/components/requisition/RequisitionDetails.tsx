@@ -152,6 +152,15 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
             updates.currentStage = nextStep;
           }
         }
+      } else if (newStatus === 'processed') {
+        const sigId = `SIG-DISB-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+        updates.status = 'processed';
+        updates.issuedInfo = {
+          userId: userProfile.uid,
+          userName: userProfile.name,
+          timestamp: new Date().toISOString(),
+          signatureId: sigId
+        };
       } else {
         updates.status = newStatus;
       }
@@ -220,7 +229,10 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
   };
 
   const isFinance = userProfile?.role === UserRole.FINANCE_HOD;
-  const canProcess = isFinance && requisition.status === 'approved';
+  const isTreasurer = userProfile?.role === UserRole.TREASURER;
+  
+  // Treasurer issues for Admin, Fuel, Workshop. others might be Finance or generic
+  const canProcess = (isTreasurer || isFinance) && requisition.status === 'approved';
 
   if (!userProfile) return null;
 
@@ -406,6 +418,42 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
                   </div>
                 </div>
               ))}
+
+              {/* Disbursement Signature */}
+              {requisition.issuedInfo && (
+                <div className="flex items-start gap-4 p-4 rounded-sm border border-blue-100 bg-blue-50/20">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border bg-blue-600 border-blue-700 text-white mt-0.5">
+                    <Check className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold uppercase tracking-tight">TREASURY / CASH ISSUED</p>
+                        <div 
+                          className="p-1.5 bg-white border border-gray-200 rounded-sm shadow-sm hover:scale-[2] transition-transform cursor-pointer origin-left z-20"
+                          title="Scan to verify issuance"
+                        >
+                          <QRCodeCanvas 
+                            value={`${getPublicOrigin()}?verify=${requisition.issuedInfo.signatureId}&reqId=${requisition.id}`} 
+                            size={40}
+                            level="M"
+                          />
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter hidden sm:inline">Scan to Verify</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-gray-400">
+                        {format(parseISO(requisition.issuedInfo.timestamp), 'MMM dd, HH:mm')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Issued by {requisition.issuedInfo.userName}
+                    </p>
+                    <div className="mt-2 py-1 px-2 border border-blue-100 bg-white inline-block text-[10px] font-mono text-blue-700 rounded-sm">
+                      TOKEN: {requisition.issuedInfo.signatureId}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
