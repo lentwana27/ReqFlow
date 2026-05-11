@@ -513,7 +513,20 @@ REQFLOW PRO System
           });
 
           if (!response.ok) {
-            console.error(`[Notification] Server responded with ${response.status} for ${approver.email}`);
+            const errorData = await response.json().catch(() => ({}));
+            console.error(`[Notification] Server error ${response.status}:`, errorData);
+            
+            // Log specifically if it's an API Key issue
+            if (response.status === 401) {
+              await auditService.log({
+                action: 'NOTIFY_FAILURE',
+                module: 'NOTIFICATION',
+                target: requisition.requisitionNumber,
+                details: `CRITICAL: Notification failed due to Invalid Resend API Key. Please check your settings.`,
+                user: 'SYSTEM',
+                username: 'system'
+              });
+            }
           } else {
             const result = await response.json();
             const isSimulated = result.simulated;

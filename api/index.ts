@@ -23,7 +23,14 @@ async function configureServer() {
   app.post('/api/notify', async (req, res) => {
     const { to, cc, subject, body } = req.body;
     const rawApiKey = process.env.RESEND_API_KEY;
-    const apiKey = rawApiKey ? rawApiKey.trim().replace(/[^\x00-\x7F]/g, "") : null;
+    // Strip all whitespace and non-printable characters
+    const apiKey = rawApiKey ? rawApiKey.replace(/\s/g, "").replace(/[^\x00-\x7F]/g, "") : null;
+
+    if (apiKey) {
+      const keyPrefix = apiKey.substring(0, 3);
+      const keyLength = apiKey.length;
+      console.log(`[Resend] API Key detected (prefix: ${keyPrefix}..., length: ${keyLength})`);
+    }
 
     console.log('--- Email Notification Request ---');
     console.log(`TO:      ${to}`);
@@ -72,7 +79,18 @@ async function configureServer() {
         const errorMessage = errorResponse?.message || 'Unknown Resend error';
         
         // If it's a verification/forbidden error (Sandbox limit or domain issue)
-        if (errorName === 'validation_error' || errorResponse?.statusCode === 403) {
+        if (errorResponse?.statusCode === 403 || errorName === 'validation_error') {
+          // If the error is specifically about the API key, we should NOT simulate success
+          if (errorMessage.toLowerCase().includes('api key is invalid')) {
+            console.error(`[Resend Error] Invalid API Key: ${errorMessage}`);
+            return res.status(401).json({ 
+              success: false, 
+              error: 'Invalid API Key',
+              message: 'The Resend API Key provided in Settings is invalid or has been revoked.',
+              hint: 'Double-check your API Key in the application Settings.'
+            });
+          }
+
           console.warn(`[Resend Sandbox Notice] Recipient: ${safeTo}. Reason: ${errorMessage}`);
           
           return res.json({ 

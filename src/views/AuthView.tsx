@@ -160,12 +160,16 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
       }
 
       const lowerMsg = msg.toLowerCase();
-      if (lowerMsg.includes('invalid login credentials') || lowerMsg.includes('invalid credentials')) {
+      
+      // Avoid overriding specific helpful messages from api.ts
+      const isGeneric = lowerMsg === 'invalid login credentials' || lowerMsg === 'invalid credentials';
+      
+      if (isGeneric) {
         msg = mode === 'reset' 
           ? 'Invalid code. Please ensure your Admin has updated your password to the 6-digit code provided in the logs.'
-          : 'Invalid username or password.';
+          : 'Invalid username or password. (Check your credentials or verify if you need to re-register after a backend change).';
       } else if (lowerMsg.includes('already registered') || lowerMsg.includes('already exists')) {
-        msg = 'That username is already taken. Please choose another or try signing in.';
+        msg = 'That username or email is already taken. Please choose another or try signing in.';
       } else if (lowerMsg.includes('rate limit')) {
         msg = 'Too many attempts. Please wait a moment and try again.';
       }
