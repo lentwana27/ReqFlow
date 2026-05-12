@@ -289,7 +289,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           onClick={() => setShowForm(true)}
           className="btn-primary flex items-center gap-2 h-12 px-6"
         >
-          <Plus className="w-4 h-4" /> New Requisition
+          <Plus className="w-4 h-4" /> Write Requisition
         </button>
       </div>
 
