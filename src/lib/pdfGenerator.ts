@@ -58,11 +58,17 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   doc.setFont('', 'normal');
   doc.text(requisition.status.toUpperCase(), pageWidth - 45, 52);
 
+  const isQR = requisition.type === 'Shop QR' || requisition.type === 'Warehouse QR';
+
   // Items Table
   autoTable(doc, {
     startY: 85,
-    head: [['Description', 'Quantity', 'Unit Cost', 'Total Cost']],
-    body: requisition.items.map(item => [
+    head: [isQR ? ['Code', 'Description', 'Quantity'] : ['Description', 'Quantity', 'Unit Cost', 'Total Cost']],
+    body: requisition.items.map(item => isQR ? [
+      item.code || 'N/A',
+      item.description,
+      item.qty
+    ] : [
       item.description,
       item.qty,
       `$${item.unitCost.toFixed(2)}`,
@@ -70,7 +76,7 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
     ]),
     theme: 'striped',
     headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255], fontStyle: 'bold' },
-    foot: [['', '', 'TOTAL AMOUNT', `$${requisition.totalAmount.toFixed(2)}`]],
+    foot: isQR ? undefined : [['', '', 'TOTAL AMOUNT', `$${requisition.totalAmount.toFixed(2)}`]],
     footStyles: { fillColor: [245, 245, 245], textColor: [26, 26, 26], fontStyle: 'bold' },
     styles: { fontSize: 9, cellPadding: 4 },
   });
