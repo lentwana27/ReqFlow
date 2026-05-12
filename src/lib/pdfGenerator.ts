@@ -58,6 +58,17 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   doc.setFont('', 'normal');
   doc.text(requisition.status.toUpperCase(), pageWidth - 45, 52);
 
+  // Notes if they exist
+  if (requisition.notes) {
+    doc.setFont('', 'bold');
+    doc.text('Notes:', 14, 73);
+    doc.setFont('', 'normal');
+    doc.setFontSize(9);
+    const splitNotes = doc.splitTextToSize(requisition.notes, pageWidth - 65);
+    doc.text(splitNotes, 55, 73);
+    doc.setFontSize(10);
+  }
+
   const isQR = requisition.type === 'Shop QR' || requisition.type === 'Warehouse QR';
   const currency = requisition.currency || 'USD';
   const symbol = currency === 'USD' ? '$' : '';

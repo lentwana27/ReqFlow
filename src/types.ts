@@ -101,6 +101,7 @@ export interface Requisition {
   approvals: Approval[];
   issuedInfo?: IssuedInfo;
   attachments?: Attachment[];
+  notes?: string;
   createdAt: any;
   updatedAt: any;
 }

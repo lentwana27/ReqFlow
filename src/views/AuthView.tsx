@@ -182,7 +182,10 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
           ? 'Invalid code or username. If you just requested a reset, please wait for an administrator to approve it.'
           : 'Invalid username or password. Check your credentials or contact an admin.';
       } else if (lowerMsg.includes('already registered') || lowerMsg.includes('already exists')) {
-        msg = 'That username or email is already taken. Please choose another or try signing in.';
+        // If the service provided a very specific message, use it, otherwise use our generic one
+        if (msg.length < 50) {
+          msg = 'That username or email is already taken. Please choose another or try signing in.';
+        }
       } else if (lowerMsg.includes('rate limit')) {
         msg = 'Too many attempts. Please wait a moment and try again.';
       }

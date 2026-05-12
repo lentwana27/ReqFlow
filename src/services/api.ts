@@ -36,19 +36,17 @@ export const authService = {
 
       // If it doesn't look like an email, try to resolve from profile
       if (!input.includes('@')) {
-        const { data: profile, error: profileFetchError } = await supabase
+        const { data: profile } = await supabase
           .from('profiles')
           .select('email, status')
           .eq('username', input.toLowerCase())
           .single();
         
-        if (profileFetchError && profileFetchError.code === 'PGRST116') {
-          throw new Error('Username not found. If the system was recently reset, please Register your account again.');
-        }
-
         if (profile?.email) {
           email = profile.email;
         } else {
+          // Fallback to default format if not in profiles
+          // This allows users to recover if they exist in auth but not profiles
           email = mapUsernameToEmail(input);
         }
       }
@@ -69,25 +67,35 @@ export const authService = {
         .single();
 
       if (profileError || !profile) {
-        // Recovery for admin
-        if (username.toLowerCase() === 'admin') {
-          const recoveryProfile: UserProfile = {
-            uid: data.user.id,
-            username: 'admin',
-            email: data.user.email || 'admin@reqflow-mail.com',
-            name: 'System Administrator',
-            role: UserRole.ADMIN,
-            department: Department.GENERAL,
-            status: 'approved',
-            isVerified: true,
-            createdAt: new Date().toISOString()
-          };
-          await supabase.from('profiles').insert(recoveryProfile);
-          cachedProfile = recoveryProfile;
-          await localDb.users.put(recoveryProfile);
-          return { user: recoveryProfile };
+        // Recovery logic: Profile is missing but login was successful
+        // This can happen after database resets or table deletions
+        const metadata = data.user.user_metadata;
+        const isAdmin = username.toLowerCase() === 'admin' || metadata?.username === 'admin';
+        
+        console.warn(`[Auth] Profile missing for user ${data.user.id}. Attempting recovery...`);
+
+        const recoveryProfile: UserProfile = {
+          uid: data.user.id,
+          username: metadata?.username || username.toLowerCase(),
+          email: data.user.email || email,
+          name: metadata?.name || username,
+          role: isAdmin ? UserRole.ADMIN : (metadata?.role as UserRole || UserRole.REQUESTER),
+          department: isAdmin ? Department.GENERAL : (metadata?.department as Department || Department.GENERAL),
+          status: isAdmin ? 'approved' : 'pending',
+          isVerified: isAdmin,
+          createdAt: new Date().toISOString()
+        };
+
+        const { error: recoveryError } = await supabase.from('profiles').insert(recoveryProfile);
+        
+        if (recoveryError) {
+          console.error('[Auth] Recovery failed:', recoveryError);
+          throw new Error('User profile not found and auto-recovery failed. Please contact the administrator.');
         }
-        throw new Error('User profile not found. If you have an account but see this, please try registering again or contact the administrator.');
+
+        cachedProfile = recoveryProfile;
+        await localDb.users.put(recoveryProfile);
+        return { user: recoveryProfile };
       }
 
       const userProfile = profile as UserProfile;
@@ -117,34 +125,59 @@ export const authService = {
     try {
       const { username, email: providedEmail, password, name, role, department } = payload;
       const email = providedEmail || mapUsernameToEmail(username.trim());
+      const normalizedUsername = username.trim().toLowerCase();
 
-      // 1. Create Auth User
+      // 1. Check if username is already taken in Profiles
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('uid, username')
+        .eq('username', normalizedUsername)
+        .single();
+      
+      if (existingProfile) {
+        throw new Error(`The username "@${normalizedUsername}" is already taken. Please choose another.`);
+      }
+
+      // 2. Create Auth User
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { name, username: username.toLowerCase() }
+          data: { name, username: normalizedUsername, role, department }
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('User already registered')) {
+          throw new Error('This email is already registered. If you forgot your password, please use the reset option or contact an admin. If the system was reset, your account might be in a recovery state—try Logging In instead.');
+        }
+        throw error;
+      }
       if (!data.user) throw new Error('Registration failed: No user data returned');
 
-      // 2. Create Profile
+      // 3. Create Profile
       const profile: UserProfile = {
         uid: data.user.id,
-        username: username.toLowerCase(),
+        username: normalizedUsername,
         email: email,
         name,
         role,
         department,
-        status: username.toLowerCase() === 'admin' ? 'approved' : 'pending',
-        isVerified: username.toLowerCase() === 'admin',
+        status: normalizedUsername === 'admin' ? 'approved' : 'pending',
+        isVerified: normalizedUsername === 'admin',
         createdAt: new Date().toISOString()
       };
 
       const { error: insertError } = await supabase.from('profiles').insert(profile);
-      if (insertError) throw insertError;
+      
+      if (insertError) {
+        // If insert fails (maybe concurrent register), try to log them in anyway if they just created the account
+        if (insertError.code === '23505') { // Unique violation
+           console.log('[Register] Profile already exists, returning login result');
+        } else {
+           throw insertError;
+        }
+      }
       
       cachedProfile = profile;
       await localDb.users.put(profile);
@@ -152,9 +185,6 @@ export const authService = {
       return { user: profile };
     } catch (error: any) {
       console.error('Registration error:', error);
-      if (error.message?.includes('User already registered')) {
-        throw new Error('This user/email is already registered. Please try logging in instead.');
-      }
       throw error;
     }
   },
@@ -175,7 +205,7 @@ export const authService = {
 
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('uid', session.user.id)
@@ -185,6 +215,26 @@ export const authService = {
         cachedProfile = profile as UserProfile;
         return cachedProfile;
       }
+
+      // If profile is missing but user is logged in, recover it
+      const metadata = session.user.user_metadata;
+      const isAdmin = metadata?.username === 'admin' || session.user.email?.startsWith('admin@');
+      
+      console.warn(`[Auth] Session exists but profile missing for ${session.user.id}. Recovering...`);
+      const recoveryProfile: UserProfile = {
+        uid: session.user.id,
+        username: metadata?.username || session.user.email?.split('@')[0] || 'user',
+        email: session.user.email || '',
+        name: metadata?.name || 'User',
+        role: isAdmin ? UserRole.ADMIN : (metadata?.role as UserRole || UserRole.REQUESTER),
+        department: isAdmin ? Department.GENERAL : (metadata?.department as Department || Department.GENERAL),
+        status: isAdmin ? 'approved' : 'pending',
+        isVerified: isAdmin,
+        createdAt: new Date().toISOString()
+      };
+      await supabase.from('profiles').insert(recoveryProfile);
+      cachedProfile = recoveryProfile;
+      return cachedProfile;
     }
     return null;
   },
@@ -367,18 +417,65 @@ export const requisitionService = {
   },
   create: async (payload: Requisition) => {
     try {
-      const { data, error } = await supabase
+      console.log('[Requisition] Creating...', payload);
+      
+      // Verify profile exists to avoid FK violation
+      const { data: profile, error: profileCheckError } = await supabase
+        .from('profiles')
+        .select('uid')
+        .eq('uid', payload.creatorId)
+        .single();
+      
+      if (profileCheckError || !profile) {
+        console.error('[Requisition] Creator profile check failed:', profileCheckError);
+        throw new Error(`Your profile (UID: ${payload.creatorId}) was not found in the database. Please try logging out and in again to resync your profile.`);
+      }
+
+      // Helper to clean payload if columns are missing
+      const cleanPayload = (p: any, key: string) => {
+        const cleaned = { ...p };
+        delete cleaned[key];
+        return cleaned;
+      };
+
+      let insertPayload = {
+        ...payload,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      let currentResult = await supabase
         .from('requisitions')
-        .insert({
-          ...payload,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        })
+        .insert(insertPayload)
         .select()
         .single();
+      
+      // Recursive safety loop for schema mismatches
+      let attempts = 0;
+      while (currentResult.error && currentResult.error.message.includes('Could not find') && currentResult.error.message.includes('column') && attempts < 5) {
+        attempts++;
+        const match = currentResult.error.message.match(/column "([^"]+)"/);
+        const missingColumn = match ? match[1] : null;
         
-      if (error) throw error;
-      const requisition = data as Requisition;
+        if (missingColumn) {
+          console.warn(`[Requisition] Column "${missingColumn}" missing in DB. Removing from payload and retrying...`);
+          insertPayload = cleanPayload(insertPayload, missingColumn);
+          currentResult = await supabase
+            .from('requisitions')
+            .insert(insertPayload)
+            .select()
+            .single();
+        } else {
+          break;
+        }
+      }
+
+      if (currentResult.error) {
+        console.error('[Requisition] Insert error after fallback attempts:', currentResult.error);
+        throw currentResult.error;
+      }
+      
+      const requisition = currentResult.data as Requisition;
       
       // Notify next approver (Stage 0)
       notificationService.notifyNextApprover(requisition).catch(console.error);
@@ -391,18 +488,44 @@ export const requisitionService = {
   },
   update: async (id: string, updates: Partial<Requisition>) => {
     try {
-      const { data, error } = await supabase
+      let updatePayload: any = {
+        ...updates,
+        updatedAt: new Date().toISOString()
+      };
+
+      let currentResult = await supabase
         .from('requisitions')
-        .update({
-          ...updates,
-          updatedAt: new Date().toISOString()
-        })
+        .update(updatePayload)
         .eq('id', id)
         .select()
         .single();
+      
+      // Recursive safety loop for schema mismatches
+      let attempts = 0;
+      while (currentResult.error && currentResult.error.message.includes('Could not find') && currentResult.error.message.includes('column') && attempts < 5) {
+        attempts++;
+        const match = currentResult.error.message.match(/column "([^"]+)"/);
+        const missingColumn = match ? match[1] : null;
         
-      if (error) throw error;
-      const requisition = data as Requisition;
+        if (missingColumn) {
+          console.warn(`[Requisition Update] Column "${missingColumn}" missing in DB. Removing from payload and retrying...`);
+          const cleaned = { ...updatePayload };
+          delete cleaned[missingColumn];
+          updatePayload = cleaned;
+          
+          currentResult = await supabase
+            .from('requisitions')
+            .update(updatePayload)
+            .eq('id', id)
+            .select()
+            .single();
+        } else {
+          break;
+        }
+      }
+
+      if (currentResult.error) throw currentResult.error;
+      const requisition = currentResult.data as Requisition;
 
       // If progress happened or status changed to pending, notify next
       if (updates.currentStage !== undefined || updates.status === 'pending') {
@@ -594,17 +717,39 @@ export const auditService = {
   },
   log: async (log: any) => {
     try {
-      const entry = {
-        user: 'System',
-        username: 'system',
+      let entry: any = {
+        user: cachedProfile?.name || 'System',
+        username: cachedProfile?.username || 'system',
         module: 'SYSTEM',
         action: 'Log',
+        userId: cachedProfile?.uid,
         ...log,
         timestamp: new Date().toISOString()
       };
-      const { data, error } = await supabase.from('activity_logs').insert(entry).select().single();
-      if (error) throw error;
-      return data as ActivityLog;
+
+      let currentResult = await supabase.from('activity_logs').insert(entry).select().single();
+
+      // Recursive safety loop for schema mismatches
+      let attempts = 0;
+      while (currentResult.error && currentResult.error.message.includes('Could not find') && currentResult.error.message.includes('column') && attempts < 5) {
+        attempts++;
+        const match = currentResult.error.message.match(/column "([^"]+)"/);
+        const missingColumn = match ? match[1] : null;
+        
+        if (missingColumn) {
+          console.warn(`[Audit Log] Column "${missingColumn}" missing in DB. Removing from entry and retrying...`);
+          const cleaned = { ...entry };
+          delete cleaned[missingColumn];
+          entry = cleaned;
+          
+          currentResult = await supabase.from('activity_logs').insert(entry).select().single();
+        } else {
+          break;
+        }
+      }
+
+      if (currentResult.error) throw currentResult.error;
+      return currentResult.data as ActivityLog;
     } catch (error) {
       console.warn('Audit log write failed:', error);
       return log;
