@@ -30,12 +30,15 @@ CREATE TABLE public.requisitions (
   "department" TEXT NOT NULL,
   "items" JSONB NOT NULL, -- Array of RequisitionItems
   "writtenTo" TEXT,
+  "currency" TEXT DEFAULT 'USD',
+  "attachments" JSONB DEFAULT '[]',
   "quotationBook" TEXT,
   "totalAmount" NUMERIC NOT NULL,
   "status" TEXT DEFAULT 'pending' CHECK ("status" IN ('pending', 'approved', 'rejected', 'processed')),
   "currentStage" INTEGER DEFAULT 0,
   "involvedRoles" TEXT[] NOT NULL,
   "approvals" JSONB NOT NULL, -- Array of Approval objects
+  "issuedInfo" JSONB, -- Final issuance info
   "createdAt" TIMESTAMPTZ DEFAULT NOW(),
   "updatedAt" TIMESTAMPTZ DEFAULT NOW()
 );
