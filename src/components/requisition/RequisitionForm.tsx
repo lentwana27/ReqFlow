@@ -232,13 +232,6 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                 </table>
               </div>
 
-              {notes && (
-                <div className="space-y-2 pt-8 border-t border-gray-100">
-                  <p className="text-[10px] uppercase font-black tracking-widest text-gray-400">Additional Notes</p>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap italic bg-gray-50 p-4 border-l-4 border-gray-200">{notes}</p>
-                </div>
-              )}
-
               {attachments.length > 0 && (
                 <div className="space-y-4 pt-8 border-t border-gray-100">
                    <p className="text-[10px] uppercase font-black tracking-widest text-gray-400">Attached Documentation ({attachments.length})</p>
@@ -253,6 +246,13 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                        </div>
                      ))}
                    </div>
+                </div>
+              )}
+
+              {notes && (
+                <div className="space-y-2 pt-8 border-t border-gray-100">
+                  <p className="text-[10px] uppercase font-black tracking-widest text-gray-400">Additional Notes</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap italic bg-gray-50 p-4 border-l-4 border-gray-200">{notes}</p>
                 </div>
               )}
 
@@ -283,16 +283,6 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                   value={writtenTo}
                   onChange={(e) => setWrittenTo(e.target.value.toUpperCase())}
                   required
-                />
-              </div>
-
-              <div className="space-y-4">
-                <label className="input-label">Notes (Optional)</label>
-                <textarea 
-                  placeholder="Additional context, justification, or special instructions..."
-                  className="w-full px-4 py-3 rounded-sm border border-gray-200 focus:border-black focus:ring-0 text-sm transition-all bg-gray-50/30 min-h-[100px] resize-none"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
                 />
               </div>
 
@@ -387,8 +377,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                 </div>
               </div>
 
-              {/* Attachments Section */}
-              <div className="space-y-4 pt-8">
+              <div className="space-y-4 pt-8 border-t border-gray-100">
                 <div className="flex items-center justify-between">
                   <label className="input-label flex items-center gap-2">
                     <Paperclip className="w-4 h-4" /> 
@@ -445,6 +434,16 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                     </div>
                   )}
                 </div>
+              </div>
+
+              <div className="space-y-4 pt-8 border-t border-gray-100">
+                <label className="input-label">Notes (Optional)</label>
+                <textarea 
+                  placeholder="Additional context, justification, or special instructions..."
+                  className="w-full px-4 py-3 rounded-sm border border-gray-200 focus:border-black focus:ring-0 text-sm transition-all bg-gray-50/30 min-h-[100px] resize-none"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
               </div>
             </div>
 

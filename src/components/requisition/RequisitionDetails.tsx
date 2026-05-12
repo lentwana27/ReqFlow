@@ -350,15 +350,6 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
             </div>
           </div>
 
-          {requisition.notes && (
-            <div className="space-y-4">
-              <label className="input-label">Additional Notes</label>
-              <div className="bg-amber-50/30 p-4 border-l-4 border-amber-200 rounded-sm italic text-sm text-gray-700 whitespace-pre-wrap">
-                {requisition.notes}
-              </div>
-            </div>
-          )}
-
           <div className="space-y-4">
             <label className="input-label">Requested Items</label>
             <div className="border border-gray-100 rounded-sm overflow-hidden text-sm">
@@ -443,6 +434,15 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {requisition.notes && (
+            <div className="space-y-4 pt-6 border-t border-gray-100">
+              <label className="input-label">Additional Notes</label>
+              <div className="bg-amber-50/30 p-4 border-l-4 border-amber-200 rounded-sm italic text-sm text-gray-700 whitespace-pre-wrap">
+                {requisition.notes}
               </div>
             </div>
           )}
