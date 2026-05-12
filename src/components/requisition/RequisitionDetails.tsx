@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { requisitionService, auditService } from '../../services/api';
-import { Requisition, UserProfile, UserRole, Department, RequisitionType } from '../../types';
-import { X, Check, XCircle, Clock, ArrowRight, Shield, Download, Loader2, AlertCircle, Lock } from 'lucide-react';
+import { Requisition, UserProfile, UserRole, Department, RequisitionType, Attachment } from '../../types';
+import { X, Check, XCircle, Clock, ArrowRight, Shield, Download, Loader2, AlertCircle, Lock, Paperclip, Eye, FileText, Image as ImageIcon } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { generateRequisitionPDF } from '../../lib/pdfGenerator';
 import { useToast } from '../../context/ToastContext';
@@ -394,6 +394,45 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
               })()}
             </div>
           </div>
+
+          {requisition.attachments && requisition.attachments.length > 0 && (
+            <div className="space-y-4">
+              <label className="input-label flex items-center gap-2">
+                <Paperclip className="w-4 h-4" /> 
+                Attachments
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {requisition.attachments.map((file, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-sm">
+                    <div className="w-8 h-8 rounded-sm bg-white border border-gray-200 flex items-center justify-center shrink-0">
+                      {file.type.startsWith('image/') ? <ImageIcon className="w-4 h-4 text-blue-500" /> : <FileText className="w-4 h-4 text-gray-500" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-bold text-gray-700 truncate">{file.name}</p>
+                      <p className="text-[9px] text-gray-400">{(file.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                    <a 
+                      href={file.url} 
+                      download={file.name}
+                      className="p-1.5 hover:bg-white hover:shadow-sm rounded-full transition-all text-gray-400 hover:text-black"
+                      title="Download Attachment"
+                    >
+                      <Download className="w-4 h-4" />
+                    </a>
+                    {file.type.startsWith('image/') && (
+                      <button 
+                        onClick={() => window.open(file.url, '_blank')}
+                        className="p-1.5 hover:bg-white hover:shadow-sm rounded-full transition-all text-gray-400 hover:text-black"
+                        title="View Full Image"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-4">
             <label className="input-label">Approval Workflow</label>

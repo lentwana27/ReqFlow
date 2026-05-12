@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, X, Loader2 } from 'lucide-react';
-import { RequisitionType, RequisitionItem, Department, REQUISITION_WORKFLOWS, UserRole } from '../../types';
-import { motion } from 'motion/react';
+import React, { useState, useRef } from 'react';
+import { Plus, Trash2, X, Loader2, Paperclip, FileText, Image as ImageIcon, FileIcon } from 'lucide-react';
+import { RequisitionType, RequisitionItem, Department, REQUISITION_WORKFLOWS, UserRole, Attachment } from '../../types';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface RequisitionFormProps {
   onClose: () => void;
@@ -17,6 +17,8 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
   const [items, setItems] = useState<RequisitionItem[]>([
     { description: '', qty: 1, unitCost: 0, totalCost: 0 }
   ]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addItem = () => {
     setItems([...items, { description: '', qty: 1, unitCost: 0, totalCost: 0 }]);
@@ -36,10 +38,46 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
     setItems(newItems);
   };
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newAttachments: Attachment[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.size > 2 * 1024 * 1024) {
+        alert(`File ${file.name} is too large. Max size is 2MB.`);
+        continue;
+      }
+
+      const reader = new FileReader();
+      const promise = new Promise<Attachment>((resolve) => {
+        reader.onload = (event) => {
+          resolve({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            url: event.target?.result as string
+          });
+        };
+      });
+      reader.readAsDataURL(file);
+      newAttachments.push(await promise);
+    }
+
+    setAttachments([...attachments, ...newAttachments]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(attachments.filter((_, i) => i !== index));
+  };
+
   const totalAmount = items.reduce((sum, item) => sum + item.totalCost, 0);
 
   const handleClose = () => {
-    const isDirty = writtenTo.trim() !== '' || items.some(item => item.description !== '' || item.qty !== 1 || item.unitCost !== 0);
+    const isDirty = writtenTo.trim() !== '' || items.some(item => item.description !== '' || item.qty !== 1 || item.unitCost !== 0) || attachments.length > 0;
     if (isDirty) {
       if (window.confirm('You have unsaved changes. Are you sure you want to exit?')) {
         onClose();
@@ -94,7 +132,8 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
         status: isAutoApproved ? 'approved' : 'pending',
         currentStage: 0,
         department: userDept,
-        requisitionNumber: `REQ-${Date.now().toString().slice(-6)}`
+        requisitionNumber: `REQ-${Date.now().toString().slice(-6)}`,
+        attachments
       });
     } catch (e) {
       console.error(e);
@@ -109,7 +148,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
         initial={{ opacity: 0, scale: 0.9, y: 40 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 40 }}
-        className="bg-white rounded-sm shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-sm shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col"
       >
         <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
           <div>
@@ -222,6 +261,66 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Attachments Section */}
+            <div className="space-y-4 pt-8">
+              <div className="flex items-center justify-between">
+                <label className="input-label flex items-center gap-2">
+                  <Paperclip className="w-4 h-4" /> 
+                  Attachments <span className="text-[10px] text-gray-400 font-normal">(Max 2MB each)</span>
+                </label>
+                <button 
+                  type="button" 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-sm"
+                >
+                  <Plus className="w-3 h-3" /> Add Files
+                </button>
+              </div>
+              
+              <input 
+                type="file"
+                className="hidden"
+                multiple
+                ref={fileInputRef}
+                onChange={handleFileChange}
+              />
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <AnimatePresence>
+                  {attachments.map((file, idx) => (
+                    <motion.div 
+                      key={idx}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-sm relative group"
+                    >
+                      <div className="w-8 h-8 rounded-sm bg-white border border-gray-200 flex items-center justify-center shrink-0">
+                        {file.type.startsWith('image/') ? <ImageIcon className="w-4 h-4 text-blue-500" /> : <FileText className="w-4 h-4 text-gray-500" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-bold text-gray-700 truncate">{file.name}</p>
+                        <p className="text-[9px] text-gray-400">{(file.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => removeAttachment(idx)}
+                        className="p-1 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                {attachments.length === 0 && (
+                  <div className="col-span-full py-8 border-2 border-dashed border-gray-100 rounded-sm flex flex-col items-center justify-center gap-2">
+                    <Paperclip className="w-6 h-6 text-gray-200" />
+                    <p className="text-[10px] uppercase font-bold text-gray-300 tracking-widest">No files attached</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

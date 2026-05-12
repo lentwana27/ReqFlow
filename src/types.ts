@@ -68,6 +68,13 @@ export interface IssuedInfo {
   signatureId: string;
 }
 
+export interface Attachment {
+  name: string;
+  type: string;
+  size: number;
+  url: string; // Base64 or URL
+}
+
 export interface Requisition {
   id: string;
   requisitionNumber: string;
@@ -84,6 +91,7 @@ export interface Requisition {
   involvedRoles: string[];
   approvals: Approval[];
   issuedInfo?: IssuedInfo;
+  attachments?: Attachment[];
   createdAt: any;
   updatedAt: any;
 }
