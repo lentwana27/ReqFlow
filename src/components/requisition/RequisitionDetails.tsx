@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { requisitionService, auditService } from '../../services/api';
-import { Requisition, UserProfile, UserRole, Department, RequisitionType, Attachment } from '../../types';
+import { Requisition, UserProfile, UserRole, Department, RequisitionType, Attachment, Currency } from '../../types';
 import { X, Check, XCircle, Clock, ArrowRight, Shield, Download, Loader2, AlertCircle, Lock, Paperclip, Eye, FileText, Image as ImageIcon } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -258,6 +258,10 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
   // Treasurer issues for Admin, Fuel, Workshop. others might be Finance or generic
   const canProcess = (isTreasurer || isFinance) && requisition.status === 'approved';
 
+  const currency = requisition.currency || Currency.USD;
+  const symbol = currency === Currency.USD ? '$' : '';
+  const suffix = currency !== Currency.USD ? ` ${currency}` : '';
+
   if (!userProfile) return null;
 
   return (
@@ -374,8 +378,8 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
                           <td className="px-4 py-3 text-center">{item.qty}</td>
                           {!isQR && (
                             <>
-                              <td className="px-4 py-3 text-right">${item.unitCost.toFixed(2)}</td>
-                              <td className="px-4 py-3 text-right font-bold">${item.totalCost.toFixed(2)}</td>
+                              <td className="px-4 py-3 text-right">{symbol}{item.unitCost.toFixed(2)}{suffix}</td>
+                              <td className="px-4 py-3 text-right font-bold">{symbol}{item.totalCost.toFixed(2)}{suffix}</td>
                             </>
                           )}
                         </tr>
@@ -384,8 +388,8 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
                     {!isQR && (
                       <tfoot className="bg-gray-50/50">
                         <tr className="font-bold">
-                          <td colSpan={3} className="px-4 py-4 text-right uppercase tracking-wider text-[10px]">Total Amount</td>
-                          <td className="px-4 py-4 text-right font-mono text-base font-bold">${requisition.totalAmount.toFixed(2)}</td>
+                          <td colSpan={3} className="px-4 py-4 text-right uppercase tracking-wider text-[10px]">Total Amount ({currency})</td>
+                          <td className="px-4 py-4 text-right font-mono text-base font-bold">{symbol}{requisition.totalAmount.toFixed(2)}{suffix}</td>
                         </tr>
                       </tfoot>
                     )}

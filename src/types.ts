@@ -75,6 +75,14 @@ export interface Attachment {
   url: string; // Base64 or URL
 }
 
+export enum Currency {
+  USD = 'USD',
+  ZM = 'ZM',
+  P = 'P',
+  ZAR = 'ZAR',
+  ZWG = 'ZWG'
+}
+
 export interface Requisition {
   id: string;
   requisitionNumber: string;
@@ -85,6 +93,7 @@ export interface Requisition {
   items: RequisitionItem[];
   writtenTo: string;
   quotationBook: string;
+  currency?: Currency;
   totalAmount: number;
   status: 'pending' | 'approved' | 'rejected' | 'processed';
   currentStage: number;

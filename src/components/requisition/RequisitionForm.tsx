@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Plus, Trash2, X, Loader2, Paperclip, FileText, Image as ImageIcon, FileIcon } from 'lucide-react';
-import { RequisitionType, RequisitionItem, Department, REQUISITION_WORKFLOWS, UserRole, Attachment } from '../../types';
+import { RequisitionType, RequisitionItem, Department, REQUISITION_WORKFLOWS, UserRole, Attachment, Currency } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface RequisitionFormProps {
@@ -12,6 +12,7 @@ interface RequisitionFormProps {
 
 export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail }: RequisitionFormProps) {
   const [type, setType] = useState<RequisitionType>(RequisitionType.ADMIN);
+  const [currency, setCurrency] = useState<Currency>(Currency.USD);
   const [writtenTo, setWrittenTo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [items, setItems] = useState<RequisitionItem[]>([
@@ -125,6 +126,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
       await onSubmit({
         type,
         writtenTo,
+        currency,
         quotationBook: '', // Keeping empty to avoid breaking types
         items,
         totalAmount,
@@ -327,6 +329,26 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
 
           <div className="w-full md:w-80 bg-gray-50/50 p-6 space-y-6 overflow-y-auto border-l border-gray-100">
             <div className="space-y-4">
+              <label className="input-label">Currency</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {Object.values(Currency).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCurrency(c)}
+                    className={`text-center px-2 py-2 rounded-sm border transition-all text-[11px] font-bold ${
+                      currency === c 
+                        ? 'border-black bg-black text-white' 
+                        : 'border-gray-200 hover:border-black bg-white text-gray-600'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4">
               <label className="input-label">Requisition Type</label>
               <div className="space-y-1.5">
                 {Object.values(RequisitionType).map((t) => {
@@ -399,8 +421,8 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
 
         <div className="p-6 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
           <div>
-            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Estimated Total</p>
-            <p className="text-2xl font-mono font-bold">${totalAmount.toFixed(2)}</p>
+            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Estimated Total ({currency})</p>
+            <p className="text-2xl font-mono font-bold">{currency === Currency.USD ? '$' : ''}{totalAmount.toFixed(2)} {currency !== Currency.USD ? currency : ''}</p>
           </div>
           <div className="flex items-center gap-3">
             <button type="button" onClick={handleClose} disabled={isSubmitting} className="btn-secondary">Cancel</button>

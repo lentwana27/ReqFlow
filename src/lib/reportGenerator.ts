@@ -44,7 +44,7 @@ export const generateSummaryPDF = (requisitions: Requisition[], type: string) =>
         req.department,
         req.creatorName,
         req.items.map(item => `${item.qty}x ${item.description}`).join('\n'),
-        `$${req.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        `${req.currency === 'USD' || !req.currency ? '$' : ''}${req.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}${req.currency && req.currency !== 'USD' ? ` ${req.currency}` : ''}`,
         req.status.toUpperCase()
       ];
     }),
@@ -68,12 +68,25 @@ export const generateSummaryPDF = (requisitions: Requisition[], type: string) =>
   });
 
   if (!isQR) {
-    const totalSum = requisitions.reduce((sum, req) => sum + req.totalAmount, 0);
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    const totalsByCurrency: Record<string, number> = {};
+    requisitions.forEach(req => {
+      const c = req.currency || 'USD';
+      totalsByCurrency[c] = (totalsByCurrency[c] || 0) + req.totalAmount;
+    });
 
-    doc.setFontSize(12);
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(10);
     doc.setFont('', 'bold');
-    doc.text(`TOTAL EXPENDITURE: $${totalSum.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, pageWidth - 14, finalY, { align: 'right' });
+    
+    let currentY = finalY;
+    doc.text('TOTAL EXPENDITURE BY CURRENCY:', pageWidth - 14, currentY, { align: 'right' });
+    
+    currentY += 5;
+    Object.entries(totalsByCurrency).forEach(([cur, sum]) => {
+      const text = `${cur === 'USD' ? '$' : ''}${sum.toLocaleString(undefined, { minimumFractionDigits: 2 })}${cur !== 'USD' ? ` ${cur}` : ''}`;
+      doc.text(`${cur}: ${text}`, pageWidth - 14, currentY, { align: 'right' });
+      currentY += 5;
+    });
   }
 
   doc.save(`${type}_Summary_Report_${format(new Date(), 'yyyy-MM-dd')}.pdf`);

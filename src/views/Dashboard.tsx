@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { requisitionService, auditService } from '../services/api';
-import { UserProfile, Requisition, UserRole, REQUISITION_WORKFLOWS, RequisitionType } from '../types';
+import { UserProfile, Requisition, UserRole, REQUISITION_WORKFLOWS, RequisitionType, Currency } from '../types';
 import RequisitionForm from '../components/requisition/RequisitionForm';
 import { Plus, Search, ArrowUpRight, CheckCircle2, Clock, XCircle, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -420,7 +420,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                   <>
                     <th className="text-left px-6 py-4">Type</th>
                     <th className="text-left px-6 py-4">Creator / Dept</th>
-                    <th className="text-left px-6 py-4">Amount</th>
+                    <th className="text-right px-6 py-4">Amount</th>
                   </>
                 )}
                 <th className="text-left px-6 py-4">Date</th>
@@ -472,7 +472,11 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                             <span className="text-[10px] text-gray-400 font-mono italic">{req.department}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 font-mono text-xs font-bold">${req.totalAmount.toFixed(2)}</td>
+                        <td className="px-6 py-4 font-mono text-xs font-bold text-right">
+                          {req.currency === Currency.USD || !req.currency ? '$' : ''}
+                          {req.totalAmount.toFixed(2)}
+                          {req.currency && req.currency !== Currency.USD ? ` ${req.currency}` : ''}
+                        </td>
                       </>
                     )}
 
