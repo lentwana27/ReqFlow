@@ -12,7 +12,6 @@ interface RequisitionFormProps {
 
 export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail }: RequisitionFormProps) {
   const [type, setType] = useState<RequisitionType>(RequisitionType.ADMIN);
-  const [adminInitialStep, setAdminInitialStep] = useState<UserRole>(UserRole.PURCHASING_HOD);
   const [writtenTo, setWrittenTo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [items, setItems] = useState<RequisitionItem[]>([
@@ -56,11 +55,6 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
     setIsSubmitting(true);
     try {
       let workflowStages = [...REQUISITION_WORKFLOWS[type]];
-      
-      // Customize initial step for Admin type if requested
-      if (type === RequisitionType.ADMIN && workflowStages.length > 0) {
-        workflowStages[0] = adminInitialStep;
-      }
       
       // Resolve HOD to specific department role if needed
       workflowStages = workflowStages.map(role => {
@@ -134,8 +128,16 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
               <label className="input-label">Requisition Type</label>
               <div className="grid grid-cols-1 gap-2">
                 {Object.values(RequisitionType).map((t) => {
-                  const isPurchasingOnly = t === RequisitionType.PURCHASING;
-                  const isAllowed = !isPurchasingOnly || userDept === Department.PURCHASING;
+                  let isAllowed = true;
+                  let restrictionMsg = '';
+
+                  if (t === RequisitionType.PURCHASING || t === RequisitionType.PROJECTS) {
+                    isAllowed = userDept === Department.PURCHASING;
+                    restrictionMsg = 'Purchasing Dept Only';
+                  } else if (t === RequisitionType.IT) {
+                    isAllowed = userDept === Department.IT;
+                    restrictionMsg = 'IT Dept Only';
+                  }
                   
                   return (
                     <button
@@ -155,7 +157,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                         <span className="text-sm font-medium">
                           {t === RequisitionType.QUOTATIONS ? t : `${t} Requisition`}
                         </span>
-                        {!isAllowed && <span className="text-[10px] uppercase font-bold text-red-400">Purchasing Dept Only</span>}
+                        {!isAllowed && <span className="text-[10px] uppercase font-bold text-red-400">{restrictionMsg}</span>}
                       </div>
                       {type === t && <div className="w-2 h-2 rounded-full bg-white animate-pulse" />}
                     </button>
@@ -167,37 +169,11 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
             <div className="bg-gray-50 p-6 rounded-sm border border-gray-100">
               <div className="flex items-center justify-between mb-4">
                 <label className="input-label mb-0">Approval Workflow</label>
-                {type === RequisitionType.ADMIN && (
-                  <div className="flex bg-white p-1 rounded-sm border border-gray-200">
-                    <button
-                      type="button"
-                      onClick={() => setAdminInitialStep(UserRole.PURCHASING_HOD)}
-                      className={`text-[9px] px-2 py-1 rounded-sm uppercase font-bold transition-colors ${
-                        adminInitialStep === UserRole.PURCHASING_HOD ? 'bg-black text-white' : 'text-gray-400 hover:text-black'
-                      }`}
-                    >
-                      Purchasing
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAdminInitialStep(UserRole.OPERATIONS_MANAGER)}
-                      className={`text-[9px] px-2 py-1 rounded-sm uppercase font-bold transition-colors ${
-                        adminInitialStep === UserRole.OPERATIONS_MANAGER ? 'bg-black text-white' : 'text-gray-400 hover:text-black'
-                      }`}
-                    >
-                      Operations
-                    </button>
-                  </div>
-                )}
               </div>
               <div className="space-y-3">
                 {(() => {
                   let workflow = [...REQUISITION_WORKFLOWS[type]];
                   
-                  if (type === RequisitionType.ADMIN && workflow.length > 0) {
-                    workflow[0] = adminInitialStep;
-                  }
-
                   // Resolve HOD to specific department role if needed
                   workflow = workflow.map(role => {
                     if (role === UserRole.HOD) {
@@ -238,50 +214,100 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
             
             <div className="space-y-2">
               <div className="grid grid-cols-12 gap-4 data-grid-header px-4">
-                <div className="col-span-6">Description</div>
-                <div className="col-span-2">Qty</div>
-                <div className="col-span-2">Unit Cost</div>
-                <div className="col-span-2 text-right">Total</div>
+                {(type === RequisitionType.SHOP_QR || type === RequisitionType.WAREHOUSE_QR) ? (
+                  <>
+                    <div className="col-span-3">Code</div>
+                    <div className="col-span-7">Description</div>
+                    <div className="col-span-2">Qty</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="col-span-6">Description</div>
+                    <div className="col-span-2">Qty</div>
+                    <div className="col-span-2">Unit Cost</div>
+                    <div className="col-span-2 text-right">Total</div>
+                  </>
+                )}
               </div>
 
-              {items.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-4 items-center px-4 py-3 bg-gray-50/50 border border-transparent hover:border-gray-100 transition-colors rounded-sm group">
-                  <div className="col-span-6">
-                    <input 
-                      placeholder="e.g. Printer Paper A4"
-                      className="w-full bg-transparent text-sm focus:outline-none"
-                      value={item.description}
-                      onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                    />
+              {items.map((item, idx) => {
+                const isQR = type === RequisitionType.SHOP_QR || type === RequisitionType.WAREHOUSE_QR;
+                return (
+                  <div key={idx} className="grid grid-cols-12 gap-4 items-center px-4 py-3 bg-gray-50/50 border border-transparent hover:border-gray-100 transition-colors rounded-sm group">
+                    {isQR && (
+                      <div className="col-span-3">
+                        <input 
+                          placeholder="CODE"
+                          className="w-full bg-transparent text-sm focus:outline-none uppercase font-mono"
+                          value={item.code || ''}
+                          onChange={(e) => updateItem(idx, 'code', e.target.value.toUpperCase())}
+                        />
+                      </div>
+                    )}
+                    <div className={isQR ? "col-span-7" : "col-span-6"}>
+                      <input 
+                        placeholder="e.g. Printer Paper A4"
+                        className="w-full bg-transparent text-sm focus:outline-none"
+                        value={item.description}
+                        onChange={(e) => updateItem(idx, 'description', e.target.value)}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <input 
+                        type="number"
+                        className="w-full bg-transparent text-sm focus:outline-none"
+                        value={item.qty}
+                        onChange={(e) => updateItem(idx, 'qty', parseInt(e.target.value) || 0)}
+                      />
+                    </div>
+                    {!isQR && (
+                      <>
+                        <div className="col-span-2">
+                          <input 
+                            type="number"
+                            className="w-full bg-transparent text-sm focus:outline-none"
+                            value={item.unitCost}
+                            onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+                        <div className="col-span-2 flex items-center justify-end gap-3">
+                          <span className="text-sm font-mono font-medium">${item.totalCost.toFixed(2)}</span>
+                          <button 
+                            type="button" 
+                            onClick={() => removeItem(idx)}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500 transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                    {isQR && (
+                      <div className="col-span-12 md:col-span-0 hidden group-hover:flex items-center justify-end absolute right-4 top-1/2 -translate-y-1/2">
+                         <button 
+                            type="button" 
+                            onClick={() => removeItem(idx)}
+                            className="p-1 text-gray-300 hover:text-red-500 transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                      </div>
+                    )}
+                    {/* Fallback for QR delete button position if above is too tricky */}
+                    {isQR && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                         <button 
+                            type="button" 
+                            onClick={() => removeItem(idx)}
+                            className="p-1 text-gray-300 hover:text-red-500 transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="col-span-2">
-                    <input 
-                      type="number"
-                      className="w-full bg-transparent text-sm focus:outline-none"
-                      value={item.qty}
-                      onChange={(e) => updateItem(idx, 'qty', parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <input 
-                      type="number"
-                      className="w-full bg-transparent text-sm focus:outline-none"
-                      value={item.unitCost}
-                      onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="col-span-2 flex items-center justify-end gap-3">
-                    <span className="text-sm font-mono font-medium">${item.totalCost.toFixed(2)}</span>
-                    <button 
-                      type="button" 
-                      onClick={() => removeItem(idx)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500 transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </form>

@@ -7,6 +7,10 @@ export enum RequisitionType {
   SHOP_QR = 'Shop QR',
   WAREHOUSE_QR = 'Warehouse QR',
   WORKSHOP = 'Workshop',
+  PROJECTS = 'Projects',
+  AFTER_SALES = 'After Sales',
+  OPERATIONS = 'Operations',
+  IT = 'IT',
   QUOTATIONS = 'Quotations'
 }
 
@@ -15,6 +19,7 @@ export enum UserRole {
   HOD = 'Head of Department',
   PURCHASING_HOD = 'Purchasing HOD',
   FINANCE_HOD = 'Finance HOD',
+  ACCOUNTING_HOD = 'Accounting HOD',
   OPERATIONS_MANAGER = 'Operations Manager',
   DIRECTOR = 'Director',
   ADMIN = 'System Administrator',
@@ -41,6 +46,7 @@ export interface RequisitionItem {
   qty: number;
   unitCost: number;
   totalCost: number;
+  code?: string;
 }
 
 export interface Approval {
@@ -114,7 +120,6 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
     UserRole.DIRECTOR
   ],
   [RequisitionType.ADMIN]: [
-    UserRole.PURCHASING_HOD,
     UserRole.FINANCE_HOD,
     UserRole.DIRECTOR
   ],
@@ -142,6 +147,27 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
     UserRole.IT_HOD
   ],
   [RequisitionType.WORKSHOP]: [
+    UserRole.PURCHASING_HOD,
+    UserRole.FINANCE_HOD,
+    UserRole.DIRECTOR
+  ],
+  [RequisitionType.PROJECTS]: [
+    UserRole.PURCHASING_HOD,
+    UserRole.FINANCE_HOD,
+    UserRole.DIRECTOR
+  ],
+  [RequisitionType.AFTER_SALES]: [
+    UserRole.PURCHASING_HOD,
+    UserRole.FINANCE_HOD,
+    UserRole.DIRECTOR
+  ],
+  [RequisitionType.OPERATIONS]: [
+    UserRole.OPERATIONS_MANAGER,
+    UserRole.ACCOUNTING_HOD,
+    UserRole.DIRECTOR
+  ],
+  [RequisitionType.IT]: [
+    UserRole.IT_HOD,
     UserRole.PURCHASING_HOD,
     UserRole.FINANCE_HOD,
     UserRole.DIRECTOR

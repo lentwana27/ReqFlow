@@ -25,6 +25,8 @@ export default function Dashboard({ userProfile }: DashboardProps) {
   const [reportType, setReportType] = useState<RequisitionType | 'ALL'>('ALL');
   const [tab, setTab] = useState<'ALL' | 'ACTION' | 'MY'>('ALL');
   const [isExporting, setIsExporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     if (!userProfile) return;
@@ -76,11 +78,18 @@ export default function Dashboard({ userProfile }: DashboardProps) {
     };
   }, [userProfile]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStartDate, filterEndDate, reportType, tab]);
+
   const filteredRequisitions = requisitions.filter(req => {
     // 1. Tab Filter
     if (tab === 'ACTION') {
       const currentApproval = req.approvals[req.currentStage];
-      if (!(req.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified)) {
+      const isApprover = req.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+      const isProcessor = req.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD);
+      
+      if (!isApprover && !isProcessor) {
         return false;
       }
     } else if (tab === 'MY') {
@@ -118,6 +127,13 @@ export default function Dashboard({ userProfile }: DashboardProps) {
 
     return matchesSearch && matchesStartDate && matchesEndDate && (reportType === 'ALL' || req.type === reportType);
   });
+
+  // Handle pagination
+  const totalPages = Math.ceil(filteredRequisitions.length / itemsPerPage);
+  const paginatedRequisitions = filteredRequisitions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const handleExportPDF = async () => {
     setIsExporting(true);
@@ -231,7 +247,9 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       label: 'Pending My Action', 
       count: requisitions.filter(r => {
         const currentApproval = r.approvals[r.currentStage];
-        return r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+        const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+        const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD);
+        return isApprover || isProcessor;
       }).length, 
       icon: Clock, 
       color: 'text-amber-600' 
@@ -301,11 +319,15 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           >
             Action Items ({requisitions.filter(r => {
               const currentApproval = r.approvals[r.currentStage];
-              return r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+              const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+              const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD);
+              return isApprover || isProcessor;
             }).length})
             {requisitions.some(r => {
               const currentApproval = r.approvals[r.currentStage];
-              return r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+              const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+              const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD);
+              return isApprover || isProcessor;
             }) && <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />}
           </button>
           <button 
@@ -362,7 +384,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            {[UserRole.FINANCE_HOD, UserRole.DIRECTOR, UserRole.ADMIN, UserRole.TREASURER].includes(userProfile.role) && (
+            {[UserRole.FINANCE_HOD, UserRole.DIRECTOR, UserRole.ADMIN, UserRole.TREASURER, UserRole.ACCOUNTING_HOD].includes(userProfile.role) && (
               <>
                 <button 
                   onClick={handleExportPDF}
@@ -388,9 +410,19 @@ export default function Dashboard({ userProfile }: DashboardProps) {
             <thead>
               <tr className="data-grid-header">
                 <th className="text-left px-6 py-4">Requisition #</th>
-                <th className="text-left px-6 py-4">Type</th>
-                <th className="text-left px-6 py-4">Creator / Dept</th>
-                <th className="text-left px-6 py-4">Amount</th>
+                {(reportType === RequisitionType.SHOP_QR || reportType === RequisitionType.WAREHOUSE_QR) ? (
+                  <>
+                    <th className="text-left px-6 py-4">Code</th>
+                    <th className="text-left px-6 py-4">Description</th>
+                    <th className="text-left px-6 py-4">Quantity</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="text-left px-6 py-4">Type</th>
+                    <th className="text-left px-6 py-4">Creator / Dept</th>
+                    <th className="text-left px-6 py-4">Amount</th>
+                  </>
+                )}
                 <th className="text-left px-6 py-4">Date</th>
                 <th className="text-left px-6 py-4">Status</th>
                 <th className="text-left px-6 py-4">Stage</th>
@@ -398,10 +430,15 @@ export default function Dashboard({ userProfile }: DashboardProps) {
               </tr>
             </thead>
             <tbody>
-              {filteredRequisitions.map((req) => {
+              {paginatedRequisitions.map((req) => {
                 const currentApproval = req.approvals[req.currentStage];
-                const needsMyApproval = req.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+                const isApprover = req.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+                const isProcessor = req.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD);
+                const needsMyAction = isApprover || isProcessor;
                 
+                // For QR types, we show the first item's details in the table if filtered
+                const firstItem = req.items[0] || { code: '-', description: '-', qty: 0 };
+
                 // Extra check for Treasurer to see only Approved items in the list even if somehow they passed through filteredRequisitions
                 if (userProfile.role === UserRole.TREASURER && req.status !== 'approved' && req.status !== 'processed') {
                   return null;
@@ -410,23 +447,35 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                 return (
                   <tr 
                     key={req.id} 
-                    className={`data-row ${needsMyApproval ? 'bg-amber-50/50 hover:bg-amber-100/50' : ''}`}
+                    className={`data-row ${needsMyAction ? 'bg-amber-50/50 hover:bg-amber-100/50' : ''}`}
                     onClick={() => setSelectedReq(req)}
                   >
                     <td className="px-6 py-4 font-mono text-xs font-bold">
                       <div className="flex items-center gap-2">
-                        {needsMyApproval && <Clock className="w-3 h-3 text-amber-500" />}
+                        {needsMyAction && <Clock className="w-3 h-3 text-amber-500" />}
                         {req.requisitionNumber}
                       </div>
                     </td>
-                    <td className="px-1 py-1"><span className="text-xs px-2 py-1 bg-gray-200 text-gray-700">{req.type}</span></td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-bold uppercase">{req.creatorName}</span>
-                        <span className="text-[10px] text-gray-400 font-mono italic">{req.department}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 font-mono text-xs font-bold">${req.totalAmount.toFixed(2)}</td>
+                    
+                    {(reportType === RequisitionType.SHOP_QR || reportType === RequisitionType.WAREHOUSE_QR) ? (
+                      <>
+                        <td className="px-6 py-4 font-mono text-xs text-blue-600 font-bold">{firstItem.code || 'N/A'}</td>
+                        <td className="px-6 py-4 text-xs font-medium max-w-[200px] truncate">{firstItem.description}</td>
+                        <td className="px-6 py-4 font-mono text-xs font-bold">{firstItem.qty}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-1 py-1"><span className="text-xs px-2 py-1 bg-gray-200 text-gray-700">{req.type}</span></td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-bold uppercase">{req.creatorName}</span>
+                            <span className="text-[10px] text-gray-400 font-mono italic">{req.department}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-mono text-xs font-bold">${req.totalAmount.toFixed(2)}</td>
+                      </>
+                    )}
+
                     <td className="px-6 py-4 text-xs text-gray-500">
                       {req.createdAt ? (
                         (() => {
@@ -440,7 +489,9 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                     </td>
                     <td className="px-2 py-2">
                       <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-sm ${getStatusColor(req.status)}`}>
-                        {req.status}
+                        {req.status === 'approved' ? 'Completed' : 
+                         req.status === 'processed' ? 'Issued' : 
+                         req.status}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -464,21 +515,21 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                             setSelectedReq(req);
                           }}
                           className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 border transition-all ${
-                            needsMyApproval 
+                            needsMyAction 
                               ? 'bg-amber-500 border-amber-600 text-white hover:bg-amber-600' 
                               : 'text-gray-400 border-transparent hover:text-black hover:border-gray-200'
                           }`}
                         >
-                          {needsMyApproval ? 'Review' : 'View'}
+                          {needsMyAction ? 'Review' : 'View'}
                         </button>
                       </div>
                     </td>
                   </tr>
                 );
               })}
-              {filteredRequisitions.length === 0 && !loading && (
+              {paginatedRequisitions.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-20 text-center text-gray-400 text-sm">
+                  <td colSpan={(reportType === RequisitionType.SHOP_QR || reportType === RequisitionType.WAREHOUSE_QR) ? 8 : 8} className="px-6 py-20 text-center text-gray-400 text-sm">
                     {tab === 'ACTION' ? 'No requisitions awaiting your approval.' : 'No requisitions found.'}
                   </td>
                 </tr>
@@ -486,6 +537,41 @@ export default function Dashboard({ userProfile }: DashboardProps) {
             </tbody>
           </table>
         </div>
+        
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
+            <p className="text-[10px] uppercase font-bold text-gray-400">
+              Page {currentPage} of {totalPages} ({filteredRequisitions.length} items)
+            </p>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-[10px] font-bold uppercase border border-gray-200 rounded-sm disabled:opacity-30 bg-white"
+              >
+                Prev
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded-sm border transition-all ${
+                    currentPage === page ? 'bg-black text-white border-black' : 'bg-white text-gray-400 border-gray-200 hover:border-black'
+                  }`}
+                >
+                  {page}
+                </button>
+              )).slice(Math.max(0, currentPage - 3), Math.min(totalPages, currentPage + 2))}
+              <button 
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-[10px] font-bold uppercase border border-gray-200 rounded-sm disabled:opacity-30 bg-white"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <AnimatePresence>

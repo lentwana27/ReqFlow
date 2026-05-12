@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { requisitionService, auditService } from '../../services/api';
-import { Requisition, UserProfile, UserRole, Department } from '../../types';
+import { Requisition, UserProfile, UserRole, Department, RequisitionType } from '../../types';
 import { X, Check, XCircle, Clock, ArrowRight, Shield, Download, Loader2, AlertCircle, Lock } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { motion } from 'motion/react';
@@ -67,7 +67,31 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
     }
   };
 
+  const canDownload = () => {
+    // Admin, Treasurer, Director, and Accounting HOD can always download
+    if (
+      userProfile.username === 'admin' || 
+      userProfile.role === UserRole.ADMIN || 
+      userProfile.role === UserRole.TREASURER ||
+      userProfile.role === UserRole.DIRECTOR ||
+      userProfile.role === UserRole.ACCOUNTING_HOD
+    ) return true;
+    
+    // Any one in the workflow can download (Approvers)
+    const isApproverRole = requisition.approvals.some(a => a.role === userProfile.role);
+    if (isApproverRole) return true;
+    
+    // Creator can also download their own req
+    if (requisition.creatorId === userProfile.uid) return true;
+    
+    return false;
+  };
+
   const handleDownload = async () => {
+    if (!canDownload()) {
+      showToast('You do not have permission to download this requisition.', 'error');
+      return;
+    }
     setIsDownloading(true);
     try {
       await generateRequisitionPDF(requisition);
@@ -146,11 +170,11 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
           }
 
           if (nextStep >= newApprovals.length) {
-            updates.status = 'approved';
-            updates.currentStage = newApprovals.length - 1;
-          } else {
-            updates.currentStage = nextStep;
-          }
+          updates.status = 'approved'; // This will be displayed as "Completed"
+          updates.currentStage = newApprovals.length - 1;
+        } else {
+          updates.currentStage = nextStep;
+        }
         }
       } else if (newStatus === 'processed') {
         const sigId = `SIG-DISB-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
@@ -197,8 +221,8 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
         newStatus === 'rejected' 
           ? `Requisition ${requisition.requisitionNumber} rejected.` 
           : newStatus === 'processed'
-            ? `Requisition ${requisition.requisitionNumber} processed and disbursed.`
-            : `Stage ${requisition.currentStage + 1} approved for ${requisition.requisitionNumber}.`,
+            ? `Requisition ${requisition.requisitionNumber} issued by Treasurer.`
+            : `Stage ${requisition.currentStage + 1} approved/completed by Director.`,
         newStatus === 'rejected' ? 'error' : 'success'
       );
 
@@ -264,14 +288,16 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
                 VERIFICATION REQUIRED
               </div>
             )}
-            <button 
-              onClick={handleDownload}
-              disabled={isDownloading}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 hover:text-black disabled:opacity-50"
-              title="Download PDF"
-            >
-              {isDownloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-            </button>
+            {canDownload() && (
+              <button 
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 hover:text-black disabled:opacity-50"
+                title="Download PDF"
+              >
+                {isDownloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+              </button>
+            )}
             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
               <X className="w-5 h-5 text-gray-400" />
             </button>
@@ -312,7 +338,9 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
                   requisition.status === 'processed' ? 'bg-green-100 text-green-700' :
                   requisition.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
                 }`}>
-                  {requisition.status}
+                  {requisition.status === 'approved' ? 'Completed' : 
+                   requisition.status === 'processed' ? 'Issued' : 
+                   requisition.status}
                 </div>
               </div>
             </div>
@@ -321,32 +349,49 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
           <div className="space-y-4">
             <label className="input-label">Requested Items</label>
             <div className="border border-gray-100 rounded-sm overflow-hidden text-sm">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr className="font-mono text-[10px] uppercase text-gray-500">
-                    <th className="text-left px-4 py-3">Description</th>
-                    <th className="text-center px-4 py-3">Qty</th>
-                    <th className="text-right px-4 py-3">Rate</th>
-                    <th className="text-right px-4 py-3">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 font-medium">
-                  {requisition.items.map((item, idx) => (
-                    <tr key={idx}>
-                      <td className="px-4 py-3">{item.description}</td>
-                      <td className="px-4 py-3 text-center">{item.qty}</td>
-                      <td className="px-4 py-3 text-right">${item.unitCost.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right font-bold">${item.totalCost.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-gray-50/50">
-                  <tr className="font-bold">
-                    <td colSpan={3} className="px-4 py-4 text-right uppercase tracking-wider text-[10px]">Total Amount</td>
-                    <td className="px-4 py-4 text-right font-mono text-base font-bold">${requisition.totalAmount.toFixed(2)}</td>
-                  </tr>
-                </tfoot>
-              </table>
+              {(() => {
+                const isQR = requisition.type === RequisitionType.SHOP_QR || requisition.type === RequisitionType.WAREHOUSE_QR;
+                return (
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-100">
+                      <tr className="font-mono text-[10px] uppercase text-gray-500">
+                        {isQR && <th className="text-left px-4 py-3">Code</th>}
+                        <th className="text-left px-4 py-3">Description</th>
+                        <th className="text-center px-4 py-3">Qty</th>
+                        {!isQR && (
+                          <>
+                            <th className="text-right px-4 py-3">Rate</th>
+                            <th className="text-right px-4 py-3">Total</th>
+                          </>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 font-medium">
+                      {requisition.items.map((item, idx) => (
+                        <tr key={idx}>
+                          {isQR && <td className="px-4 py-3 font-mono text-blue-600 font-bold">{item.code || 'N/A'}</td>}
+                          <td className="px-4 py-3">{item.description}</td>
+                          <td className="px-4 py-3 text-center">{item.qty}</td>
+                          {!isQR && (
+                            <>
+                              <td className="px-4 py-3 text-right">${item.unitCost.toFixed(2)}</td>
+                              <td className="px-4 py-3 text-right font-bold">${item.totalCost.toFixed(2)}</td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                    {!isQR && (
+                      <tfoot className="bg-gray-50/50">
+                        <tr className="font-bold">
+                          <td colSpan={3} className="px-4 py-4 text-right uppercase tracking-wider text-[10px]">Total Amount</td>
+                          <td className="px-4 py-4 text-right font-mono text-base font-bold">${requisition.totalAmount.toFixed(2)}</td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                );
+              })()}
             </div>
           </div>
 
@@ -428,7 +473,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold uppercase tracking-tight">TREASURY / CASH ISSUED</p>
+                        <p className="text-sm font-bold uppercase tracking-tight">DISBURSEMENT / ISSUANCE</p>
                         <div 
                           className="p-1.5 bg-white border border-gray-200 rounded-sm shadow-sm hover:scale-[2] transition-transform cursor-pointer origin-left z-20"
                           title="Scan to verify issuance"
@@ -542,12 +587,12 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
                 ) : requisition.status === 'processed' ? (
                   <>
                     <Check className="w-4 h-4 text-green-600" />
-                    <span className="text-green-600 uppercase font-black tracking-widest">Requisition Processed</span>
+                    <span className="text-green-600 uppercase font-black tracking-widest">Requisition Issued</span>
                   </>
                 ) : (
                   <>
                     <Check className="w-4 h-4 text-blue-600" />
-                    <span className="text-blue-600 uppercase">Status: {requisition.status}</span>
+                    <span className="text-blue-600 uppercase">Status: {requisition.status === 'approved' ? 'Completed' : requisition.status}</span>
                   </>
                 )}
               </div>

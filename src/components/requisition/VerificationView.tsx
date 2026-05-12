@@ -119,7 +119,7 @@ export default function VerificationView({ id, signatureId, onClose, onPublic }:
                   {requisition.issuedInfo?.signatureId === signatureId ? (
                     <>
                       <p className="text-sm font-bold text-blue-900">
-                        TREASURY / CASH DISBURSEMENT
+                        DISBURSEMENT / ISSUANCE
                       </p>
                       <p className="text-[11px] text-blue-700 mt-1 font-medium">
                         Verified Issuance by {requisition.issuedInfo.userName}
