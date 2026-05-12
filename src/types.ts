@@ -115,7 +115,7 @@ export interface ActivityLog {
 // Workflow definitions based on specific department types
 export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
   [RequisitionType.PURCHASING]: [
-    UserRole.HOD, // Dept HOD first
+    UserRole.PURCHASING_HOD,
     UserRole.FINANCE_HOD,
     UserRole.DIRECTOR
   ],
