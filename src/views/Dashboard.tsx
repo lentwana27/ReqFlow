@@ -17,6 +17,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
   const { showToast } = useToast();
   const [requisitions, setRequisitions] = useState<Requisition[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingReq, setEditingReq] = useState<Requisition | null>(null);
   const [selectedReq, setSelectedReq] = useState<Requisition | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -186,42 +187,56 @@ export default function Dashboard({ userProfile }: DashboardProps) {
     document.body.removeChild(link);
   };
 
-  const handleCreateRequisition = async (data: any) => {
+  const handleSubmitRequisition = async (data: any) => {
     if (!userProfile) return;
     try {
-      // Role resolving and de-duplication
+      const isUpdate = !!editingReq;
       const now = new Date().toISOString();
+      
       const requisitionData = {
         ...data,
-        id: crypto.randomUUID(),
         creatorId: userProfile.uid,
         creatorName: userProfile.name,
-        department: userProfile.department,
-        status: 'pending',
-        currentStage: 0,
         involvedRoles: Array.from(new Set(data.approvals.map((a: any) => a.role))),
-        createdAt: now,
         updatedAt: now,
       };
 
-      const newReq = await requisitionService.create(requisitionData as Requisition);
-      setRequisitions(prev => [newReq, ...prev]);
+      if (!isUpdate) {
+        // Create Path
+        const newReq = await requisitionService.create(requisitionData as Requisition);
+        setRequisitions(prev => [newReq, ...prev]);
 
-      await auditService.log({
-        user: userProfile.name,
-        username: userProfile.username || userProfile.email,
-        action: 'Create Requisition',
-        module: 'SYSTEM',
-        target: newReq.id,
-        details: `Requisition of type ${requisitionData.type} created by ${userProfile.name}. REQ#: ${requisitionData.requisitionNumber}`
-      });
+        await auditService.log({
+          user: userProfile.name,
+          username: userProfile.username || userProfile.email,
+          action: 'Create Requisition',
+          module: 'SYSTEM',
+          target: newReq.id,
+          details: `Requisition of type ${requisitionData.type} created by ${userProfile.name}. REQ#: ${requisitionData.requisitionNumber}`
+        });
+        showToast('Requisition created successfully');
+      } else {
+        // Update Path (Resubmit)
+        const updatedReq = await requisitionService.update(editingReq!.id, requisitionData);
+        setRequisitions(prev => prev.map(r => r.id === updatedReq.id ? updatedReq : r));
+
+        await auditService.log({
+          user: userProfile.name,
+          username: userProfile.username || userProfile.email,
+          action: 'Resubmit Requisition',
+          module: 'SYSTEM',
+          target: updatedReq.id,
+          details: `Requisition ${requisitionData.requisitionNumber} modified and resubmitted by creator. Resetting to Stage 1 approval.`
+        });
+        showToast('Requisition resubmitted successfully');
+      }
 
       setShowForm(false);
-      showToast('Requisition created successfully');
+      setEditingReq(null);
     } catch (error: any) {
-      console.error('Create req error:', error);
+      console.error('Submit req error:', error);
       
-      let msg = 'Failed to create requisition';
+      let msg = 'Failed to submit requisition';
       try {
         const parsed = JSON.parse(error.message);
         if (parsed.error) msg = parsed.error;
@@ -583,14 +598,23 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           <RequisitionForm 
             userDept={userProfile.department}
             userEmail={userProfile.username || userProfile.email}
-            onClose={() => setShowForm(false)}
-            onSubmit={handleCreateRequisition}
+            initialData={editingReq || undefined}
+            onClose={() => {
+              setShowForm(false);
+              setEditingReq(null);
+            }}
+            onSubmit={handleSubmitRequisition}
           />
         )}
         {selectedReq && userProfile && (
           <RequisitionDetails 
             requisition={selectedReq}
             userProfile={userProfile}
+            onEdit={(req) => {
+              setSelectedReq(null);
+              setEditingReq(req);
+              setShowForm(true);
+            }}
             onClose={() => {
                 setSelectedReq(null);
                 // Refresh list on close in case of updates

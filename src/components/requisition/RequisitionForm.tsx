@@ -8,19 +8,20 @@ interface RequisitionFormProps {
   onSubmit: (data: any) => void;
   userDept: Department;
   userEmail: string;
+  initialData?: Requisition;
 }
 
-export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail }: RequisitionFormProps) {
-  const [type, setType] = useState<RequisitionType>(RequisitionType.ADMIN);
-  const [currency, setCurrency] = useState<Currency>(Currency.USD);
-  const [notes, setNotes] = useState('');
-  const [writtenTo, setWrittenTo] = useState('');
+export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail, initialData }: RequisitionFormProps) {
+  const [type, setType] = useState<RequisitionType>(initialData?.type || RequisitionType.ADMIN);
+  const [currency, setCurrency] = useState<Currency>(initialData?.currency || Currency.USD);
+  const [notes, setNotes] = useState(initialData?.notes || '');
+  const [writtenTo, setWrittenTo] = useState(initialData?.writtenTo || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
-  const [items, setItems] = useState<RequisitionItem[]>([
-    { description: '', qty: 1, unitCost: 0, totalCost: 0 }
-  ]);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [items, setItems] = useState<RequisitionItem[]>(
+    initialData?.items || [{ description: '', qty: 1, unitCost: 0, totalCost: 0 }]
+  );
+  const [attachments, setAttachments] = useState<Attachment[]>(initialData?.attachments || []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addItem = () => {
@@ -135,21 +136,34 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
 
       const isAutoApproved = workflowStages.length === 0;
 
-      await onSubmit({
+      const submissionData: any = {
         type,
         writtenTo,
         currency,
-        quotationBook: '', // Keeping empty to avoid breaking types
+        quotationBook: initialData?.quotationBook || '',
         items,
         totalAmount,
         approvals: initialApprovals,
         status: isAutoApproved ? 'approved' : 'pending',
         currentStage: 0,
         department: userDept,
-        requisitionNumber: `REQ-${Date.now().toString().slice(-6)}`,
         attachments,
-        notes
-      });
+        notes,
+        rejectionReason: null, // Clear rejection reason on resubmit
+        updatedAt: new Date().toISOString()
+      };
+
+      if (!initialData) {
+        submissionData.id = crypto.randomUUID();
+        submissionData.requisitionNumber = `REQ-${Date.now().toString().slice(-6)}`;
+        submissionData.createdAt = new Date().toISOString();
+      } else {
+        submissionData.id = initialData.id;
+        submissionData.requisitionNumber = initialData.requisitionNumber;
+        submissionData.createdAt = initialData.createdAt;
+      }
+
+      await onSubmit(submissionData);
     } catch (e) {
       console.error(e);
     } finally {
@@ -178,7 +192,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
             )}
             <div>
               <h2 className="text-xl font-bold tracking-tight">
-                {isPreview ? 'Preview Requisition' : 'Write Requisition'}
+                {isPreview ? 'Preview Requisition' : initialData ? 'Edit & Resubmit Requisition' : 'Write Requisition'}
               </h2>
               <p className="text-xs text-gray-400 font-mono mt-1">DEPARTMENT: {userDept} | CREATOR: {userEmail}</p>
             </div>
@@ -565,7 +579,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                   className="btn-primary flex items-center gap-2"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {isSubmitting ? 'Sending...' : 'Confirm & Send'}
+                  {isSubmitting ? 'Sending...' : initialData ? 'Update & Resubmit' : 'Confirm & Send'}
                 </button>
               </>
             ) : (
@@ -584,7 +598,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                   className="btn-primary flex items-center gap-2"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {isSubmitting ? 'Submitting...' : 'Submit Requisition'}
+                  {isSubmitting ? 'Submitting...' : initialData ? 'Update & Resubmit' : 'Submit Requisition'}
                 </button>
               </>
             )}

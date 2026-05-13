@@ -585,6 +585,42 @@ export const notificationService = {
         return;
       }
 
+      const appUrl = window.location.origin.replace(/\/$/, '');
+      const requisitionLink = `${appUrl}?requisitionId=${requisition.id}`;
+
+      // Handle Rejection Notification
+      if (requisition.status === 'rejected') {
+        const { data: creatorProfile } = await supabase.from('profiles').select('email, name').eq('uid', requisition.creatorId).single();
+        if (creatorProfile?.email) {
+          console.log(`[Notification] Sending rejection notice to ${creatorProfile.email}...`);
+          await fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: creatorProfile.email,
+              subject: `Update: Requisition ${requisition.requisitionNumber} REJECTED`,
+              body: `
+Hello ${creatorProfile.name},
+
+Your requisition ${requisition.requisitionNumber} has been REJECTED.
+
+REASON FOR REJECTION:
+${requisition.rejectionReason || 'No specific reason provided.'}
+
+You can view the details here:
+${requisitionLink}
+
+If you need to make corrections, please create a new requisition or contact the approver.
+
+Thank you,
+REQFLOW PRO System
+              `.trim()
+            })
+          }).catch(console.error);
+        }
+        return;
+      }
+
       const nextRole = approvals[currentStage]?.role;
       if (!nextRole) return;
       
@@ -634,9 +670,6 @@ export const notificationService = {
         });
         return;
       }
-
-      const appUrl = window.location.origin.replace(/\/$/, '');
-      const requisitionLink = `${appUrl}?requisitionId=${requisition.id}`;
 
       // Get requester email for CC?
       const { data: creatorProfile } = await supabase.from('profiles').select('email').eq('uid', requisition.creatorId).single();

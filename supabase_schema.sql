@@ -33,6 +33,7 @@ CREATE TABLE public.requisitions (
   "currency" TEXT DEFAULT 'USD',
   "attachments" JSONB DEFAULT '[]',
   "notes" TEXT,
+  "rejectionReason" TEXT,
   "quotationBook" TEXT,
   "totalAmount" NUMERIC NOT NULL,
   "status" TEXT DEFAULT 'pending' CHECK ("status" IN ('pending', 'approved', 'rejected', 'processed')),

@@ -13,9 +13,10 @@ interface RequisitionDetailsProps {
   requisition: Requisition;
   userProfile: UserProfile;
   onClose: () => void;
+  onEdit?: (req: Requisition) => void;
 }
 
-export default function RequisitionDetails({ requisition, userProfile, onClose }: RequisitionDetailsProps) {
+export default function RequisitionDetails({ requisition, userProfile, onClose, onEdit }: RequisitionDetailsProps) {
   const { showToast } = useToast();
   const [comment, setComment] = useState('');
   const [isProcessing, setIsProcessing] = useState<'approved' | 'rejected' | 'processed' | null>(null);
@@ -125,6 +126,15 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
       const updates: any = {
         updatedAt: new Date().toISOString()
       };
+
+      if (newStatus === 'rejected' && isApproval) {
+        if (!comment || comment.trim().length < 5) {
+          showToast('Please provide a reason for rejection (at least 5 characters).', 'error');
+          setIsProcessing(null);
+          return;
+        }
+        updates.rejectionReason = comment;
+      }
 
       if (isApproval) {
         let newApprovals = [...requisition.approvals];
@@ -309,6 +319,20 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-12">
+          {requisition.status === 'rejected' && requisition.rejectionReason && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-red-50 border-l-4 border-red-500 p-6 rounded-sm space-y-2 mb-8"
+            >
+              <div className="flex items-center gap-2 text-red-700">
+                <XCircle className="w-5 h-5" />
+                <h3 className="font-bold text-sm uppercase tracking-tight">Requisition Rejected</h3>
+              </div>
+              <p className="text-sm text-red-600 italic">"{requisition.rejectionReason}"</p>
+            </motion.div>
+          )}
+
           {/* Header Info */}
           <div className="grid grid-cols-2 gap-8 bg-gray-50/50 p-6 rounded-sm border border-gray-100">
             <div className="space-y-4">
@@ -556,7 +580,25 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
         </div>
 
         <div className="p-6 border-t border-gray-100 bg-gray-50">
-          {canApprove() ? (
+          {requisition.status === 'rejected' && requisition.creatorId === userProfile.uid ? (
+            <div className="space-y-4">
+              <div className="bg-red-50 border border-red-100 p-4 rounded-sm flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-red-900 uppercase">Requisition Rejected</p>
+                  <p className="text-xs text-red-700">
+                    You can modify the details and resubmit this requisition. This will reset the approval process from Stage 1.
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => onEdit && onEdit(requisition)}
+                className="w-full btn-primary bg-black hover:bg-gray-700 border-none flex items-center justify-center gap-2 h-12 transition-all active:scale-[0.98]"
+              >
+                <FileText className="w-4 h-4" /> Edit & Resubmit Requisition
+              </button>
+            </div>
+          ) : canApprove() ? (
             <div className="space-y-4">
               <textarea 
                 placeholder="Add an optional comment..."

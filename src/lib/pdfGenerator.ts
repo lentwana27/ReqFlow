@@ -58,14 +58,28 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   doc.setFont('', 'normal');
   doc.text(requisition.status.toUpperCase(), pageWidth - 45, 52);
 
+  // Rejection Reason if it exists
+  if (requisition.status === 'rejected' && requisition.rejectionReason) {
+    doc.setFont('', 'bold');
+    doc.setTextColor(200, 0, 0);
+    doc.text('REJECTION REASON:', 14, 73);
+    doc.setFont('', 'normal');
+    doc.setFontSize(9);
+    const splitReason = doc.splitTextToSize(requisition.rejectionReason, pageWidth - 65);
+    doc.text(splitReason, 55, 73);
+    doc.setFontSize(10);
+    doc.setTextColor(26, 26, 26);
+  }
+
   // Notes if they exist
   if (requisition.notes) {
+    const notesY = (requisition.status === 'rejected' && requisition.rejectionReason) ? 80 : 73;
     doc.setFont('', 'bold');
-    doc.text('Notes:', 14, 73);
+    doc.text('Notes:', 14, notesY);
     doc.setFont('', 'normal');
     doc.setFontSize(9);
     const splitNotes = doc.splitTextToSize(requisition.notes, pageWidth - 65);
-    doc.text(splitNotes, 55, 73);
+    doc.text(splitNotes, 55, notesY);
     doc.setFontSize(10);
   }
 
@@ -74,9 +88,22 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   const symbol = currency === 'USD' ? '$' : '';
   const suffix = currency !== 'USD' ? ` ${currency}` : '';
 
+  // Calculate table start Y dynamically
+  let tableStartY = 85;
+  if (requisition.notes) {
+    const notesY = (requisition.status === 'rejected' && requisition.rejectionReason) ? 80 : 73;
+    const splitNotes = doc.splitTextToSize(requisition.notes, pageWidth - 65);
+    tableStartY = notesY + (splitNotes.length * 5) + 5;
+  } else if (requisition.status === 'rejected' && requisition.rejectionReason) {
+    const splitReason = doc.splitTextToSize(requisition.rejectionReason, pageWidth - 65);
+    tableStartY = 73 + (splitReason.length * 5) + 5;
+  }
+  
+  if (tableStartY < 85) tableStartY = 85;
+
   // Items Table
   autoTable(doc, {
-    startY: 85,
+    startY: tableStartY,
     head: [isQR ? ['Code', 'Description', 'Quantity'] : ['Description', 'Quantity', 'Unit Cost', 'Total Cost']],
     body: requisition.items.map(item => isQR ? [
       item.code || 'N/A',
