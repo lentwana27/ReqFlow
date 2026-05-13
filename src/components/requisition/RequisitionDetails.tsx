@@ -47,7 +47,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose }
 
     setIsDeleting(true);
     try {
-      await requisitionService.delete(requisition.id);
+      await requisitionService.delete(requisition.id, userProfile);
       
       await auditService.log({
         user: userProfile.name,

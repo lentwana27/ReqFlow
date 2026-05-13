@@ -538,11 +538,31 @@ export const requisitionService = {
       throw error;
     }
   },
-  delete: async (id: string) => {
+  delete: async (id: string, userProfile?: UserProfile | null) => {
     try {
+      console.log(`[Requisition] Deleting ${id}...`);
       const { error } = await supabase.from('requisitions').delete().eq('id', id);
-      if (error) throw error;
-    } catch (error) {
+      
+      if (error) {
+        console.error('[Requisition] Delete failed:', error);
+        throw error;
+      }
+
+      // Cleanup local cache
+      await localDb.requisitions.delete(id).catch(e => console.warn('Local cleanup failed:', e));
+      
+      // Attempt to log if profile provided
+      if (userProfile) {
+        await auditService.log({
+          user: userProfile.name,
+          username: userProfile.username || userProfile.email,
+          action: 'FORCE_DELETE',
+          module: 'REQUISITION',
+          target: id,
+          details: `Requisition permanently deleted from system by ${userProfile.name}`
+        }).catch(e => console.warn('Audit log failed after delete:', e));
+      }
+    } catch (error: any) {
       console.error('Delete requisition error:', error);
       throw error;
     }

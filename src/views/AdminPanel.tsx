@@ -798,7 +798,7 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
                           onClick={async () => {
                             if (confirm('Delete this requisition permanently?')) {
                               try {
-                                await requisitionService.delete(req.id);
+                                await requisitionService.delete(req.id, userProfile);
                                 setRequisitions((prev) => prev.filter((r) => r.id !== req.id));
                                 showToast('Requisition deleted');
                               } catch (e: any) {
