@@ -19,6 +19,8 @@ interface RequisitionDetailsProps {
 export default function RequisitionDetails({ requisition, userProfile, onClose, onEdit }: RequisitionDetailsProps) {
   const { showToast } = useToast();
   const [comment, setComment] = useState('');
+  const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState<'approved' | 'rejected' | 'processed' | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -120,20 +122,22 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     return checkRoleMatch(userProfile, currentApproval.role, requisition.department);
   };
 
-  const handleUpdateStatus = async (newStatus: 'approved' | 'rejected' | 'processed', isApproval = false) => {
+  const handleUpdateStatus = async (newStatus: 'approved' | 'rejected' | 'processed', isApproval = false, overrideComment?: string) => {
     setIsProcessing(newStatus);
+    const activeComment = overrideComment ?? comment;
+    
     try {
       const updates: any = {
         updatedAt: new Date().toISOString()
       };
 
       if (newStatus === 'rejected' && isApproval) {
-        if (!comment || comment.trim().length < 5) {
+        if (!activeComment || activeComment.trim().length < 5) {
           showToast('Please provide a reason for rejection (at least 5 characters).', 'error');
           setIsProcessing(null);
           return;
         }
-        updates.rejectionReason = comment;
+        updates.rejectionReason = activeComment;
       }
 
       if (isApproval) {
@@ -148,7 +152,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
           approverId: userProfile.uid,
           approverName: userProfile.name,
           timestamp,
-          comment,
+          comment: activeComment,
           signatureId: newStatus === 'approved' ? sigId : null
         };
 
@@ -208,10 +212,10 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
       if (isApproval) {
         if (newStatus === 'rejected') {
           actionLabel = 'Requisition Rejected';
-          detailsText = `Requisition rejected at stage ${requisition.currentStage + 1} by ${userProfile.name}${comment ? `: ${comment}` : ''}`;
+          detailsText = `Requisition rejected at stage ${requisition.currentStage + 1} by ${userProfile.name}${activeComment ? `: ${activeComment}` : ''}`;
         } else {
           actionLabel = 'Requisition Approved';
-          detailsText = `Requisition stage ${requisition.currentStage + 1} approved by ${userProfile.name}${comment ? `: ${comment}` : ''}`;
+          detailsText = `Requisition stage ${requisition.currentStage + 1} approved by ${userProfile.name}${activeComment ? `: ${activeComment}` : ''}`;
         }
       } else {
         actionLabel = 'Requisition Processed';
@@ -608,12 +612,12 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
               />
               <div className="flex items-center gap-3">
                 <button 
-                  onClick={() => handleUpdateStatus('rejected', true)}
+                  onClick={() => setIsRejectionModalOpen(true)}
                   disabled={!!isProcessing || isSuccess}
                   className="flex-1 btn-secondary text-red-600 border-red-200 hover:bg-red-50 flex items-center justify-center gap-2 h-12 disabled:opacity-50"
                 >
                   <XCircle className="w-4 h-4" /> 
-                  {isProcessing === 'rejected' ? 'Rejecting...' : 'Reject Request'}
+                  Reject Request
                 </button>
                 <button 
                   onClick={() => handleUpdateStatus('approved', true)}
@@ -704,6 +708,64 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
           )}
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {isRejectionModalOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-sm shadow-2xl overflow-hidden border border-gray-100"
+            >
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-red-50">
+                <div className="flex items-center gap-2 text-red-700">
+                  <XCircle className="w-5 h-5" />
+                  <h3 className="font-bold text-sm uppercase tracking-tight">Rejection Reason</h3>
+                </div>
+                <button onClick={() => setIsRejectionModalOpen(false)} className="text-red-400 hover:text-red-700">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-xs text-gray-500 italic">
+                  Please provide a clear reason for rejecting this requisition. This feedback will be sent to the creator.
+                </p>
+                <textarea 
+                  autoFocus
+                  placeholder="Enter reason here... (min 5 characters)"
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="w-full h-32 p-3 text-sm border border-gray-200 rounded-sm focus:outline-none focus:ring-1 focus:ring-red-500 bg-white resize-none"
+                />
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => setIsRejectionModalOpen(false)}
+                    className="flex-1 px-4 py-2 text-sm font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      if (rejectionReason.trim().length < 5) {
+                        showToast('Please provide a valid reason (min 5 characters)', 'error');
+                        return;
+                      }
+                      await handleUpdateStatus('rejected', true, rejectionReason);
+                      setIsRejectionModalOpen(false);
+                      setRejectionReason('');
+                    }}
+                    disabled={!!isProcessing || rejectionReason.trim().length < 5}
+                    className="flex-1 bg-red-600 text-white py-2 rounded-sm text-sm font-bold uppercase tracking-widest hover:bg-red-700 transition-colors disabled:opacity-50"
+                  >
+                    {isProcessing === 'rejected' ? 'Rejecting...' : 'Confirm Rejection'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -149,7 +149,16 @@ export const authService = {
 
       if (error) {
         if (error.message.includes('User already registered')) {
-          throw new Error('This email is already registered. If you forgot your password, please use the reset option or contact an admin. If the system was reset, your account might be in a recovery state—try Logging In instead.');
+          console.log('[Register] User already exists in Auth. Attempting transparent login/recovery...');
+          try {
+            // Self-correction: if they are already registered, try to log in with these credentials
+            // This handles cases where the database was wiped but Auth persisted
+            const loginResult = await authService.login(username, password);
+            return loginResult;
+          } catch (loginError: any) {
+            console.error('[Register] Transparent login failed:', loginError);
+            throw new Error('This email is already registered. If you forgot your password, please use the reset option or contact an admin. If the system was reset, your account might be in a recovery state—try Logging In instead.');
+          }
         }
         throw error;
       }
@@ -262,7 +271,9 @@ export const authService = {
       }
     }
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/`,
+    });
     if (error) throw error;
   },
 
@@ -525,10 +536,14 @@ export const requisitionService = {
       }
 
       if (currentResult.error) throw currentResult.error;
-      const requisition = currentResult.data as Requisition;
+      
+      // Merge updates back into the returned data to ensure ephemeral fields (like rejectionReason) 
+      // are available for notifications even if they weren't saved to the DB due to schema mismatches
+      const requisition = { ...currentResult.data, ...updates } as Requisition;
 
       // If progress happened or status changed to pending, notify next
-      if (updates.currentStage !== undefined || updates.status === 'pending') {
+      // Also notify if status is rejected
+      if (updates.currentStage !== undefined || updates.status === 'pending' || updates.status === 'rejected') {
         notificationService.notifyNextApprover(requisition).catch(console.error);
       }
 

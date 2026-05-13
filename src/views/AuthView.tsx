@@ -18,13 +18,22 @@ function generateResetCode(): string {
 }
 
 export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewProps) {
-  const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'reset'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'reset' | 'update-password'>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   // Prevents double-submit while request is in-flight
   const submitting = useRef(false);
+
+  // Monitor URL hash for password recovery link
+  React.useEffect(() => {
+    // Detect password recovery via hash
+    if (window.location.hash.includes('access_token=') && window.location.hash.includes('type=recovery')) {
+      setMode('update-password');
+      setSuccess('Recovery link verified. Please enter your new permanent password below.');
+    }
+  }, []);
 
   // ─── Form fields ────────────────────────────────────────────────────────────
   const [username, setUsername] = useState('');
@@ -100,27 +109,51 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
 
       // ── FORGOT PASSWORD ────────────────────────────────────────────────────
       } else if (mode === 'forgot') {
-        if (!username.trim()) throw new Error('Please enter your username.');
+        if (!username.trim()) throw new Error('Please enter your username or email.');
 
-        // 1. Generate a secure 6-digit code
+        // 1. Call Supabase reset method (Sends real email)
+        await authService.requestPasswordReset(username.trim().toLowerCase());
+
+        // 2. Generate a secure 6-digit code (for fallback/admin bypass)
         const code = generateResetCode();
 
-        // 2. Write it to the audit log so the admin can see it instantly
+        // 3. Write it to the audit log so the admin can see it instantly
         await auditService.log({
           user: 'Anonymous',
           username: username.trim().toLowerCase(),
           action: 'Password Reset Request',
           module: 'AUTH',
           target: 'USER',
-          details: `User requested password reset. Code: ${code}`,
+          details: `User requested password reset via email. Internal recovery code: ${code}`,
         });
 
-        // 3. Optional: call Supabase reset method (standard flow)
-        try {
-          await authService.requestPasswordReset(username.trim().toLowerCase());
-        } catch (_) { /* ignore if not configured */ }
+        setSuccess(`Reset link sent to your registered email. Please check your inbox and follow the link to set a new password. (Fallback Code: ${code})`);
 
-        setSuccess(`Reset request logged. YOUR CODE: ${code}. Please provide this code to your Admin to authorize your access.`);
+      // ── UPDATE PASSWORD (FROM EMAIL LINK) ───────────────────────────────────
+      } else if (mode === 'update-password') {
+        if (password.length < 6) throw new Error('New password must be at least 6 characters.');
+        if (password !== confirmPassword) throw new Error('Passwords do not match.');
+
+        await authService.changePassword(password);
+        
+        // After changing, we need to get user profile to log in
+        const userProfile = await authService.getCurrentUser();
+        if (!userProfile) throw new Error('Password updated, but profile retrieval failed. Please try logging in manually.');
+
+        auditService.log({
+          user: userProfile.name,
+          username: userProfile.username,
+          action: 'Password Reset (Email Link)',
+          module: 'AUTH',
+          target: 'USER',
+          details: `User @${userProfile.username} successfully reset their password via email link.`,
+        }).catch(console.warn);
+
+        setSuccess('Password updated successfully. Logging you in...');
+        
+        // Clean hash from URL
+        window.history.replaceState(null, '', window.location.pathname);
+        onLoginSuccess(userProfile);
 
       // ── RESET PASSWORD (LOGIN WITH CODE) ───────────────────────────────────
       } else if (mode === 'reset') {
@@ -202,12 +235,14 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
     signup: 'Create Account',
     forgot: 'Forgot Password',
     reset: 'Login with Code',
+    'update-password': 'Set New Password',
   };
   const subtitles: Record<typeof mode, string> = {
     login: 'Sign in to manage your department requisitions.',
     signup: 'Join the system to start processing requisitions.',
-    forgot: 'Enter your username to request a reset code from your admin.',
+    forgot: 'Enter your username or email to receive a reset link.',
     reset: 'Enter the 6-digit code from your admin to access your account.',
+    'update-password': 'Create a secure new password for your account.',
   };
 
   return (
@@ -281,17 +316,19 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
                 )}
               </AnimatePresence>
 
-              <div className="relative">
-                <UserIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Username"
-                  required
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  className="w-full border border-gray-200 pl-10 pr-4 py-2.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-black text-sm"
-                />
-              </div>
+            {(mode !== 'update-password') && (
+               <div className="relative">
+                 <UserIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                 <input
+                   type="text"
+                   placeholder={mode === 'forgot' ? "Username or Email" : "Username"}
+                   required
+                   value={username}
+                   onChange={e => setUsername(e.target.value)}
+                   className="w-full border border-gray-200 pl-10 pr-4 py-2.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-black text-sm"
+                 />
+               </div>
+            )}
 
               {mode === 'signup' && (
                 <div className="relative">
@@ -326,7 +363,7 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
                   <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="password"
-                    placeholder={mode === 'reset' ? 'New Password' : 'Password'}
+                    placeholder={mode === 'reset' || mode === 'update-password' ? 'New Password' : 'Password'}
                     required
                     value={password}
                     onChange={e => setPassword(e.target.value)}
@@ -335,7 +372,7 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
                 </div>
               )}
 
-              {(mode === 'signup' || mode === 'reset') && (
+              {(mode === 'signup' || mode === 'reset' || mode === 'update-password') && (
                 <input
                   type="password"
                   placeholder="Confirm Password"
@@ -356,7 +393,7 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
               disabled={isLoading}
               className="w-full bg-black text-white py-3 rounded-lg flex items-center justify-center gap-2 group font-bold text-sm hover:bg-gray-900 transition-colors disabled:opacity-60"
             >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Submit'}
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Create Account' : mode === 'update-password' ? 'Update Password' : 'Submit'}
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
           </form>
