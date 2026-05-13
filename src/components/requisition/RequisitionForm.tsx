@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Plus, Trash2, X, Loader2, Paperclip, FileText, Image as ImageIcon, FileIcon, Eye, ArrowLeft } from 'lucide-react';
-import { RequisitionType, RequisitionItem, Department, REQUISITION_WORKFLOWS, UserRole, Attachment, Currency } from '../../types';
+import { RequisitionType, RequisitionItem, Department, REQUISITION_WORKFLOWS, UserRole, Attachment, Currency, Requisition } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface RequisitionFormProps {

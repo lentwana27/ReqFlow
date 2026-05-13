@@ -454,7 +454,7 @@ export const requisitionService = {
       let attempts = 0;
       while (currentResult.error && currentResult.error.message.includes('Could not find') && currentResult.error.message.includes('column') && attempts < 5) {
         attempts++;
-        const match = currentResult.error.message.match(/column "([^"]+)"/);
+        const match = currentResult.error.message.match(/column ['"]([^'"]+)['"]/) || currentResult.error.message.match(/['"]([^'"]+)['"] column/);
         const missingColumn = match ? match[1] : null;
         
         if (missingColumn) {
@@ -504,7 +504,7 @@ export const requisitionService = {
       let attempts = 0;
       while (currentResult.error && currentResult.error.message.includes('Could not find') && currentResult.error.message.includes('column') && attempts < 5) {
         attempts++;
-        const match = currentResult.error.message.match(/column "([^"]+)"/);
+        const match = currentResult.error.message.match(/column ['"]([^'"]+)['"]/) || currentResult.error.message.match(/['"]([^'"]+)['"] column/);
         const missingColumn = match ? match[1] : null;
         
         if (missingColumn) {
@@ -786,7 +786,7 @@ export const auditService = {
       let attempts = 0;
       while (currentResult.error && currentResult.error.message.includes('Could not find') && currentResult.error.message.includes('column') && attempts < 5) {
         attempts++;
-        const match = currentResult.error.message.match(/column "([^"]+)"/);
+        const match = currentResult.error.message.match(/column ['"]([^'"]+)['"]/) || currentResult.error.message.match(/['"]([^'"]+)['"] column/);
         const missingColumn = match ? match[1] : null;
         
         if (missingColumn) {
