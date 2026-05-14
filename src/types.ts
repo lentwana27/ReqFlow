@@ -25,6 +25,7 @@ export enum UserRole {
   DIRECTOR = 'Director',
   ADMIN = 'System Administrator',
   SHOP_SUPERVISOR = 'Shop Supervisor',
+  SHOP_HOD = 'Shop Head of Department',
   IT_HOD = 'IT HOD',
   WAREHOUSE_HOD = 'Warehouse HOD',
   TREASURER = 'Treasurer'
@@ -156,6 +157,7 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
   ],
   [RequisitionType.SHOP_USE]: [
     UserRole.SHOP_SUPERVISOR,
+    UserRole.SHOP_HOD,
     UserRole.OPERATIONS_MANAGER,
     UserRole.FINANCE_HOD
   ],

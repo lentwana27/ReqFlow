@@ -124,6 +124,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
         if (role === UserRole.HOD) {
           if (userDept === Department.IT) return UserRole.IT_HOD;
           if (userDept === Department.WAREHOUSE) return UserRole.WAREHOUSE_HOD;
+          if (userDept === Department.SHOP) return UserRole.SHOP_HOD;
           return UserRole.HOD;
         }
         return role;
@@ -534,6 +535,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                       if (role === UserRole.HOD) {
                         if (userDept === Department.IT) return UserRole.IT_HOD;
                         if (userDept === Department.WAREHOUSE) return UserRole.WAREHOUSE_HOD;
+                        if (userDept === Department.SHOP) return UserRole.SHOP_HOD;
                         return `HOD (${userDept})`;
                       }
                       return role;
