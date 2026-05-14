@@ -271,10 +271,15 @@ export const authService = {
       }
     }
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/`,
+    const response = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
     });
-    if (error) throw error;
+
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Failed to send reset email');
+    return result;
   },
 
   updateProfile: async (updates: Partial<UserProfile>) => {
@@ -886,5 +891,18 @@ export const auditService = {
       console.warn('Audit log write failed:', error);
       return log;
     }
+  }
+};
+
+export const customAuthService = {
+  completePasswordReset: async (data: any) => {
+    const response = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Failed to reset password');
+    return result;
   }
 };

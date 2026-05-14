@@ -14,6 +14,28 @@ async function configureServer() {
   const PORT = 3000;
 
   app.use(express.json());
+  
+  // Ensure recovery_tokens table exists
+  const initDb = async () => {
+    const url = process.env.VITE_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !serviceRoleKey) return;
+
+    try {
+      const supabaseAdmin = createClient(url, serviceRoleKey);
+      // Simple check/creation using RPC or just catch error in endpoints (RPC is safer but requires setup)
+      // Since we can't easily run arbitrary SQL via the client without an RPC function, 
+      // we'll just log and rely on the user running the SQL for now, 
+      // but we'll add a check to warn in logs.
+      const { error } = await supabaseAdmin.from('recovery_tokens').select('id').limit(1);
+      if (error && error.code === 'PGRST116' || (error && error.message.includes('relation "public.recovery_tokens" does not exist'))) {
+        console.warn('[DB] recovery_tokens table missing. Password resets via email may fail until created via supabase_schema.sql');
+      }
+    } catch (err) {
+      console.warn('[DB] Failed to check for recovery_tokens table');
+    }
+  };
+  initDb();
 
   // Health check
   app.get('/api/health', (req, res) => {
@@ -50,6 +72,123 @@ async function configureServer() {
       res.json({ success: true, message: 'Password updated successfully' });
     } catch (err: any) {
       console.error('[Admin Auth] Reset password error:', err);
+      res.status(500).json({ error: err.message || 'Failed to update password' });
+    }
+  });
+
+  // Manual Password Reset Request
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    const url = process.env.VITE_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const resendApiKey = process.env.RESEND_API_KEY;
+
+    if (!url || !serviceRoleKey || !resendApiKey) {
+      return res.status(503).json({ error: 'System not configured for password resets.' });
+    }
+
+    try {
+      const supabaseAdmin = createClient(url, serviceRoleKey);
+      
+      // 1. Verify user exists
+      const { data: user, error: userError } = await supabaseAdmin.auth.admin.listUsers();
+      const targetUser = user?.users.find(u => u.email === email);
+      
+      if (!targetUser) {
+        // Silent success for security
+        return res.json({ success: true, message: 'If an account exists for this email, a reset link has been sent.' });
+      }
+
+      // 2. Generate token
+      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 1); // 1 hour expiry
+
+      // 3. Save token
+      const { error: tokenError } = await supabaseAdmin
+        .from('recovery_tokens')
+        .insert([{ email, token, expiresAt: expiresAt.toISOString() }]);
+
+      if (tokenError) throw tokenError;
+
+      // 4. Send email
+      const resend = new Resend(resendApiKey.replace(/\s/g, ""));
+      const origin = req.headers.origin || `https://${req.headers.host}`;
+      const recoveryLink = `${origin}/?recoveryToken=${token}&email=${encodeURIComponent(email)}`;
+      
+      const fromEmail = process.env.VERIFIED_FROM_EMAIL || 'ReqFlow Pro <onboarding@resend.dev>';
+      
+      await resend.emails.send({
+        from: fromEmail,
+        to: [email],
+        subject: 'Reset Your ReqFlow Pro Password',
+        text: `
+Hello,
+
+You recently requested to reset your password for ReqFlow Pro.
+
+To reset your password, please follow the link below (valid for 1 hour):
+${recoveryLink}
+
+If you did not request this, please ignore this email.
+
+Thank you,
+REQFLOW PRO System
+        `.trim()
+      });
+
+      res.json({ success: true, message: 'Reset link sent successfully.' });
+    } catch (err: any) {
+      console.error('[Auth] Forgot password error:', err);
+      res.status(500).json({ error: 'Failed to process forgot password request' });
+    }
+  });
+
+  // Manual Password Reset Completion
+  app.post('/api/auth/reset-password', async (req, res) => {
+    const { token, email, newPassword } = req.body;
+    const url = process.env.VITE_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !serviceRoleKey) {
+      return res.status(503).json({ error: 'System not configured for password resets.' });
+    }
+
+    try {
+      const supabaseAdmin = createClient(url, serviceRoleKey);
+
+      // 1. Verify token
+      const { data: tokenData, error: tokenError } = await supabaseAdmin
+        .from('recovery_tokens')
+        .select('*')
+        .eq('token', token)
+        .eq('email', email)
+        .gt('expiresAt', new Date().toISOString())
+        .single();
+
+      if (tokenError || !tokenData) {
+        return res.status(400).json({ error: 'Invalid or expired recovery link. Please request a new one.' });
+      }
+
+      // 2. Resolve user ID
+      const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      const targetUser = users?.users.find(u => u.email === email);
+      
+      if (!targetUser) throw new Error('User not found');
+
+      // 3. Update password
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(targetUser.id, {
+        password: newPassword
+      });
+
+      if (updateError) throw updateError;
+
+      // 4. Delete token
+      await supabaseAdmin.from('recovery_tokens').delete().eq('id', tokenData.id);
+
+      res.json({ success: true, message: 'Password updated successfully. You can now log in.' });
+    } catch (err: any) {
+      console.error('[Auth] Reset password error:', err);
       res.status(500).json({ error: err.message || 'Failed to update password' });
     }
   });

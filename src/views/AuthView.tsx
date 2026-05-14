@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { authService, auditService } from '../services/api';
+import { authService, auditService, customAuthService } from '../services/api';
 import { UserRole, Department, ROLES, DEPARTMENTS, UserProfile } from '../types';
 import {
   LogIn, UserPlus, Shield, Loader2, ArrowRight,
@@ -25,10 +25,26 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
 
   // Prevents double-submit while request is in-flight
   const submitting = useRef(false);
+  const [recoveryToken, setRecoveryToken] = useState('');
+  const [recoveryEmail, setRecoveryEmail] = useState('');
 
-  // Monitor URL hash for password recovery link
+  // Monitor URL params for password recovery link
   React.useEffect(() => {
-    // Detect password recovery via hash
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('recoveryToken');
+    const email = params.get('email');
+
+    if (token && email) {
+      setMode('update-password');
+      setRecoveryToken(token);
+      setRecoveryEmail(email);
+      setSuccess('Recovery link verified. Please enter your new permanent password below.');
+      
+      // Clean query params
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    
+    // Legacy hash detection (fallback)
     if (window.location.hash.includes('access_token=') && window.location.hash.includes('type=recovery')) {
       setMode('update-password');
       setSuccess('Recovery link verified. Please enter your new permanent password below.');
@@ -134,26 +150,39 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
         if (password.length < 6) throw new Error('New password must be at least 6 characters.');
         if (password !== confirmPassword) throw new Error('Passwords do not match.');
 
-        await authService.changePassword(password);
-        
-        // After changing, we need to get user profile to log in
-        const userProfile = await authService.getCurrentUser();
-        if (!userProfile) throw new Error('Password updated, but profile retrieval failed. Please try logging in manually.');
+        if (recoveryToken && recoveryEmail) {
+          // Manual recovery flow (bypasses Supabase localhost redirect issue)
+          await customAuthService.completePasswordReset({
+            token: recoveryToken,
+            email: recoveryEmail,
+            newPassword: password
+          });
+          setSuccess('Password updated successfully. You can now log in.');
+          setMode('login');
+          return;
+        } else {
+          // Authenticated recovery flow (Supabase standard)
+          await authService.changePassword(password);
+          
+          // After changing, we need to get user profile to log in
+          const userProfile = await authService.getCurrentUser();
+          if (!userProfile) throw new Error('Password updated, but profile retrieval failed. Please try logging in manually.');
 
-        auditService.log({
-          user: userProfile.name,
-          username: userProfile.username,
-          action: 'Password Reset (Email Link)',
-          module: 'AUTH',
-          target: 'USER',
-          details: `User @${userProfile.username} successfully reset their password via email link.`,
-        }).catch(console.warn);
+          auditService.log({
+            user: userProfile.name,
+            username: userProfile.username,
+            action: 'Password Reset (Email Link)',
+            module: 'AUTH',
+            target: 'USER',
+            details: `User @${userProfile.username} successfully reset their password via email link.`,
+          }).catch(console.warn);
 
-        setSuccess('Password updated successfully. Logging you in...');
-        
-        // Clean hash from URL
-        window.history.replaceState(null, '', window.location.pathname);
-        onLoginSuccess(userProfile);
+          setSuccess('Password updated successfully. Logging you in...');
+          
+          // Clean status from URL
+          window.history.replaceState(null, '', window.location.pathname);
+          onLoginSuccess(userProfile);
+        }
 
       // ── RESET PASSWORD (LOGIN WITH CODE) ───────────────────────────────────
       } else if (mode === 'reset') {

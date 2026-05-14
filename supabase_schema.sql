@@ -59,6 +59,15 @@ CREATE TABLE public.activity_logs (
   "userId" UUID REFERENCES public.profiles("uid") ON DELETE CASCADE
 );
 
+-- 4. Password Recovery Tokens (For manual recovery link flow)
+CREATE TABLE public.recovery_tokens (
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "email" TEXT NOT NULL,
+  "token" TEXT UNIQUE NOT NULL,
+  "expiresAt" TIMESTAMPTZ NOT NULL,
+  "createdAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- RLS (Row Level Security)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.requisitions ENABLE ROW LEVEL SECURITY;
