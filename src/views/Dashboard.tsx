@@ -42,19 +42,6 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           setRequisitions(localData);
           setLoading(false);
           
-          // Auto-open requisition if passed in URL
-          const params = new URLSearchParams(window.location.search);
-          const reqId = params.get('requisitionId');
-          if (reqId && !selectedReq) {
-            const found = localData.find(r => r.id === reqId);
-            if (found) {
-              setSelectedReq(found);
-              // Clear param from URL without reloading
-              const newUrl = window.location.pathname;
-              window.history.replaceState({}, '', newUrl);
-            }
-          }
-
           // Auto-switch to Action tab if there are items needing approval
           const needsApproval = localData.filter(r => {
             const currentApproval = r.approvals[r.currentStage];
@@ -77,6 +64,28 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       isMounted = false;
       clearInterval(interval);
     };
+  }, [userProfile]);
+
+  // Separate Effect for Auto-opening from URL
+  useEffect(() => {
+    if (!userProfile) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const reqId = params.get('requisitionId');
+    
+    if (reqId && !selectedReq) {
+      requisitionService.getById(reqId).then(req => {
+        if (req) {
+          setSelectedReq(req);
+          // Only clear if we actually found and set it
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, '', newUrl);
+        }
+      }).catch(err => {
+        console.warn('Auto-open failed:', err);
+        showToast('The requested requisition was not found or you do not have permission to view it.', 'error');
+      });
+    }
   }, [userProfile]);
 
   useEffect(() => {

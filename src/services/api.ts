@@ -387,24 +387,29 @@ export const requisitionService = {
       const isAdminOrDirector = userProfile.username === 'admin' || userProfile.role === UserRole.ADMIN || userProfile.role === UserRole.DIRECTOR;
       if (isAdminOrDirector) return allReqs;
 
-      // Special case for Treasurer: Only specific approved types
-      if (userProfile.role === UserRole.TREASURER) {
-        return allReqs.filter(req => {
-          const isApproved = req.status === 'approved' || req.status === 'processed';
-          const allowedTypes = [
-            'Admin', 
-            'Purchasing', 
-            'Fuel', 
-            'Workshop'
-          ];
-          return isApproved && allowedTypes.includes(req.type as any);
-        });
-      }
-
+      // Expand list logic:
+      // 1. You created it
+      // 2. You are in the approval chain
+      // 3. You are a "Processor" (Finance HOD / Treasurer) and it is approved/processed
       return allReqs.filter(req => {
         if (req.creatorId === userProfile.uid) return true;
+        
         const isApproverInChain = req.approvals.some(approval => approval.role === userProfile.role);
-        return isApproverInChain;
+        if (isApproverInChain) return true;
+
+        const isFinanceOrTreasurer = userProfile.role === UserRole.FINANCE_HOD || userProfile.role === UserRole.TREASURER;
+        const isApprovedOrProcessed = req.status === 'approved' || req.status === 'processed';
+        
+        if (isFinanceOrTreasurer && isApprovedOrProcessed) {
+          // If Treasurer, further restrict by allowed types
+          if (userProfile.role === UserRole.TREASURER) {
+            const allowedTypes = ['Admin', 'Purchasing', 'Fuel', 'Workshop'];
+            return allowedTypes.includes(req.type as any);
+          }
+          return true;
+        }
+
+        return false;
       });
     } catch (error) {
       console.error('List requisitions error:', error);
@@ -587,16 +592,75 @@ export const requisitionService = {
 // --- NOTIFICATION SERVICE ---
 
 export const notificationService = {
-  notifyNextApprover: async (requisition: Requisition) => {
+  async processApprovedRequisition(requisition: Requisition) {
+    try {
+      console.log(`[Notification] Requisition ${requisition.requisitionNumber} APPROVED. Notifying processors...`);
+      
+      const appUrl = window.location.origin.replace(/\/$/, '');
+      const requisitionLink = `${appUrl}?requisitionId=${requisition.id}`;
+
+      // Notify Finance HOD and Treasurer
+      const { data: processors, error } = await supabase
+        .from('profiles')
+        .select('email, name, role')
+        .or(`role.eq.${UserRole.FINANCE_HOD},role.eq.${UserRole.TREASURER}`)
+        .eq('status', 'approved');
+
+      if (error) throw error;
+      if (!processors || processors.length === 0) return;
+
+      for (const proc of processors) {
+        if (!proc.email) continue;
+        
+        // Treasurer only handles specific types
+        if (proc.role === UserRole.TREASURER) {
+          const allowedTypes = ['Admin', 'Purchasing', 'Fuel', 'Workshop'];
+          if (!allowedTypes.includes(requisition.type as any)) continue;
+        }
+
+        console.log(`[Notification] Notifying processor ${proc.email} (${proc.role})...`);
+        
+        await fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: proc.email,
+            subject: `Ready for Disbursement: Requisition ${requisition.requisitionNumber}`,
+            body: `
+Hello ${proc.name},
+
+Requisition ${requisition.requisitionNumber} has been FULLY APPROVED and is now ready for disbursement processing.
+
+DETAILS:
+- Requisition #: ${requisition.requisitionNumber}
+- Requested By: ${requisition.creatorName}
+- Type: ${requisition.type}
+- Amount: $${requisition.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+
+You can process this requisition here:
+${requisitionLink}
+
+Thank you,
+REQFLOW PRO System
+            `.trim()
+          })
+        }).catch(console.error);
+      }
+    } catch (err) {
+      console.error('[Notification] Error processing approved requisition:', err);
+    }
+  },
+
+  async notifyNextApprover(requisition: Requisition) {
     try {
       const currentStage = requisition.currentStage;
       const approvals = requisition.approvals;
       
       if (currentStage >= approvals.length && requisition.status !== 'approved') return; // No more stages unless just finishing
       
-      // If requisition is fully approved, maybe notify creator?
+      // If requisition is fully approved, notify processors (Finance HOD / Treasurer)
       if (requisition.status === 'approved') {
-        console.log('Requisition fully approved. Notification for final status could be sent here.');
+        this.processApprovedRequisition(requisition).catch(console.error);
         return;
       }
 
