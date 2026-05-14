@@ -114,10 +114,11 @@ async function configureServer() {
       // 4. Send email
       const resend = new Resend(resendApiKey.replace(/\s/g, ""));
       
-      let origin = req.headers.origin || `https://${req.headers.host}`;
+      let origin = process.env.VITE_APP_URL || req.headers.origin || `https://${req.headers.host}`;
+      origin = origin.replace(/\/$/, ''); // Remove trailing slash if any
       
       // AI Studio specific: -dev- URLs are restricted, -pre- are public
-      if (origin.includes('-dev-')) {
+      if (origin.includes('-dev-') && !process.env.VITE_APP_URL) {
         origin = origin.replace('-dev-', '-pre-');
       }
       
