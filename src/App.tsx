@@ -34,6 +34,16 @@ function AppContent() {
   const [loading, setLoading] = useState(!hasCachedSession);
   const authResolved = useRef(false);
 
+  // ─── Deep link capturing ───────────────────────────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requisitionId = params.get('requisitionId') || params.get('reqId');
+    if (requisitionId && !params.get('verify')) {
+      console.log('[App] Deep link detected:', requisitionId);
+      sessionStorage.setItem('reqflow_deep_link', requisitionId);
+    }
+  }, []);
+
   // ─── Verification URL params ───────────────────────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

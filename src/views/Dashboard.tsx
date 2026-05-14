@@ -71,18 +71,23 @@ export default function Dashboard({ userProfile }: DashboardProps) {
     if (!userProfile) return;
 
     const params = new URLSearchParams(window.location.search);
-    const reqId = params.get('requisitionId');
+    const reqIdFromUrl = params.get('requisitionId') || params.get('reqId');
+    const reqIdFromSession = sessionStorage.getItem('reqflow_deep_link');
+    const targetId = reqIdFromUrl || reqIdFromSession;
     
-    if (reqId && !selectedReq) {
-      requisitionService.getById(reqId).then(req => {
+    if (targetId && !selectedReq) {
+      console.log('[Dashboard] Attempting auto-open for:', targetId);
+      requisitionService.getById(targetId).then(req => {
         if (req) {
           setSelectedReq(req);
-          // Only clear if we actually found and set it
+          // Cleanup
+          sessionStorage.removeItem('reqflow_deep_link');
           const newUrl = window.location.pathname;
           window.history.replaceState({}, '', newUrl);
         }
       }).catch(err => {
         console.warn('Auto-open failed:', err);
+        sessionStorage.removeItem('reqflow_deep_link');
         showToast('The requested requisition was not found or you do not have permission to view it.', 'error');
       });
     }

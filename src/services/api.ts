@@ -6,6 +6,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { UserProfile, UserRole, Department, Requisition, ActivityLog } from '../types';
 import { localDb } from './localDb';
+import { getPublicOrigin } from '../lib/urls';
 
 // --- INITIALIZATION ---
 
@@ -601,8 +602,8 @@ export const notificationService = {
     try {
       console.log(`[Notification] Requisition ${requisition.requisitionNumber} APPROVED. Notifying processors...`);
       
-      const appUrl = window.location.origin.replace(/\/$/, '');
-      const requisitionLink = `${appUrl}?requisitionId=${requisition.id}`;
+      const appUrl = getPublicOrigin();
+      const requisitionLink = `${appUrl}/?requisitionId=${requisition.id}`;
 
       // Notify Finance HOD and Treasurer
       const { data: processors, error } = await supabase
@@ -669,8 +670,8 @@ REQFLOW PRO System
         return;
       }
 
-      const appUrl = window.location.origin.replace(/\/$/, '');
-      const requisitionLink = `${appUrl}?requisitionId=${requisition.id}`;
+      const appUrl = getPublicOrigin();
+      const requisitionLink = `${appUrl}/?requisitionId=${requisition.id}`;
 
       // Handle Rejection Notification
       if (requisition.status === 'rejected') {

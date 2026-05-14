@@ -91,8 +91,8 @@ async function configureServer() {
       const supabaseAdmin = createClient(url, serviceRoleKey);
       
       // 1. Verify user exists
-      const { data: user, error: userError } = await supabaseAdmin.auth.admin.listUsers();
-      const targetUser = user?.users.find(u => u.email === email);
+      const { data: userData, error: userError } = await supabaseAdmin.auth.admin.listUsers();
+      const targetUser = (userData?.users as any[])?.find(u => u.email === email);
       
       if (!targetUser) {
         // Silent success for security
@@ -113,7 +113,14 @@ async function configureServer() {
 
       // 4. Send email
       const resend = new Resend(resendApiKey.replace(/\s/g, ""));
-      const origin = req.headers.origin || `https://${req.headers.host}`;
+      
+      let origin = req.headers.origin || `https://${req.headers.host}`;
+      
+      // AI Studio specific: -dev- URLs are restricted, -pre- are public
+      if (origin.includes('-dev-')) {
+        origin = origin.replace('-dev-', '-pre-');
+      }
+      
       const recoveryLink = `${origin}/?recoveryToken=${token}&email=${encodeURIComponent(email)}`;
       
       const fromEmail = process.env.VERIFIED_FROM_EMAIL || 'ReqFlow Pro <onboarding@resend.dev>';
@@ -171,8 +178,8 @@ REQFLOW PRO System
       }
 
       // 2. Resolve user ID
-      const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-      const targetUser = users?.users.find(u => u.email === email);
+      const { data: userDataList, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      const targetUser = (userDataList?.users as any[])?.find(u => u.email === email);
       
       if (!targetUser) throw new Error('User not found');
 
