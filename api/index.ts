@@ -156,10 +156,25 @@ app.post('/api/auth/reset-password', async (req, res) => {
 app.post('/api/notify', async (req, res) => {
   const { to, cc, subject, body } = req.body;
   const rawApiKey = process.env.RESEND_API_KEY;
-  const apiKey = rawApiKey ? rawApiKey.replace(/\s/g, "").replace(/[^\x00-\x7F]/g, "") : null;
+  let apiKey = rawApiKey ? rawApiKey.replace(/\s/g, "").replace(/[^\x00-\x7F]/g, "") : null;
+
+  // Safeguard against stringified "undefined"/"null" or placeholder keys
+  if (apiKey === 'undefined' || apiKey === 'null' || apiKey === 're_YOUR_KEY_HERE' || (apiKey && apiKey.length < 10)) {
+    apiKey = null;
+  }
+
+  console.log('[Notification] Incoming request body:', JSON.stringify({ to, cc, subject, hasBody: !!body }));
+
+  if (!to || !subject || !body) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Missing required notification fields', 
+      received: { to: !!to, subject: !!subject, body: !!body } 
+    });
+  }
 
   if (apiKey) {
-    console.log(`[Notification] Request to: ${to}. API Key present (prefix: ${apiKey.substring(0, 4)}...).`);
+    console.log(`[Notification] API Key present (prefix: ${apiKey.substring(0, 4)}...).`);
   } else {
     console.warn('[Notification] RESEND_API_KEY IS MISSING IN ENVIRONMENT.');
   }
@@ -182,14 +197,23 @@ app.post('/api/notify', async (req, res) => {
     let fromEmail = sanitizeHeader(configuredFrom || defaultFrom);
     
     console.log(`[Notification] Sending via Resend from: ${fromEmail}`);
+    console.log(`[Notification] Parameters:`, JSON.stringify({ to: sanitizeHeader(to), subject: sanitizeHeader(subject) }));
     
-    const { data, error } = await resend.emails.send({
-      from: fromEmail,
-      to: [sanitizeHeader(to)],
-      cc: cc ? [sanitizeHeader(cc)] : undefined,
-      subject: sanitizeHeader(subject),
-      text: body,
-    });
+    let sendResult;
+    try {
+      sendResult = await resend.emails.send({
+        from: fromEmail,
+        to: [sanitizeHeader(to)],
+        cc: cc ? [sanitizeHeader(cc)] : undefined,
+        subject: sanitizeHeader(subject),
+        text: body,
+      });
+    } catch (sendError: any) {
+      console.error('[Notification] resend.emails.send THREW:', sendError);
+      throw sendError;
+    }
+
+    const { data, error } = sendResult;
 
     if (error) {
       console.error('[Notification] Resend API Error:', JSON.stringify(error, null, 2));
@@ -210,9 +234,14 @@ app.post('/api/notify', async (req, res) => {
 
     console.log(`[Notification] Email sent successfully. ID: ${data?.id}`);
     res.json({ success: true, id: data?.id });
-  } catch (err) {
+  } catch (err: any) {
     console.error('[Notification] Internal error:', err);
-    res.status(500).json({ success: false, error: 'Internal server error while sending email' });
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error while sending email',
+      details: err.message || String(err),
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 
