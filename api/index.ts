@@ -1,8 +1,6 @@
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -83,7 +81,8 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     if (tokenError) throw tokenError;
 
-    const resend = new Resend(resendApiKey.replace(/\s/g, ""));
+    const { Resend: ResendClass } = await import('resend');
+    const resend = new ResendClass(resendApiKey.replace(/\s/g, ""));
     
     let origin = process.env.VITE_APP_URL || req.headers.origin || `https://${req.headers.host}`;
     origin = origin.replace(/\/$/, '');
@@ -189,10 +188,12 @@ app.post('/api/notify', async (req, res) => {
   }
 
   try {
-    const resend = new Resend(apiKey);
-    const defaultFrom = 'ReqFlow Pro <onboarding@resend.dev>';
+    const ResendModule = await import('resend');
+    const resend = new ResendModule.Resend(apiKey);
+    
+    const defaultFrom = 'onboarding@resend.dev';
     const configuredFrom = process.env.VERIFIED_FROM_EMAIL;
-    const sanitizeHeader = (str: string) => str ? str.trim().replace(/[^\x00-\x7F]/g, "") : "";
+    const sanitizeHeader = (str: any) => (typeof str === 'string') ? str.trim().replace(/[^\x00-\x7F]/g, "") : "";
     
     let fromEmail = sanitizeHeader(configuredFrom || defaultFrom);
     
@@ -210,8 +211,10 @@ app.post('/api/notify', async (req, res) => {
       });
     } catch (sendError: any) {
       console.error('[Notification] resend.emails.send THREW:', sendError);
-      throw sendError;
+      throw new Error(`Resend SDK throw: ${sendError.message || String(sendError)}`);
     }
+
+    if (!sendResult) throw new Error('Resend returned no result');
 
     const { data, error } = sendResult;
 
@@ -240,7 +243,7 @@ app.post('/api/notify', async (req, res) => {
       success: false, 
       error: 'Internal server error while sending email',
       details: err.message || String(err),
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      hint: 'Please check your RESEND_API_KEY and VERIFIED_FROM_EMAIL in Vercel environment variables.'
     });
   }
 });
@@ -267,12 +270,17 @@ async function configureServer() {
   initDb();
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    try {
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } catch (err) {
+      console.error('Failed to initialize Vite middleware:', err);
+    }
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
