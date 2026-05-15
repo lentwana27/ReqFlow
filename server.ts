@@ -1,11 +1,7 @@
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
@@ -173,12 +169,13 @@ app.post('/api/notify', async (req, res) => {
   }
 
   if (apiKey) {
-    console.log(`[Notification] API Key present (prefix: ${apiKey.substring(0, 4)}...).`);
+    console.log(`[Notification] API Key present (prefix: ${apiKey.substring(0, 4)}...). Length: ${apiKey.length}`);
   } else {
     console.warn('[Notification] RESEND_API_KEY IS MISSING IN ENVIRONMENT.');
   }
 
   if (!apiKey) {
+    console.log('[Notification] Defaulting to simulation mode...');
     return res.json({ 
       success: true, 
       simulated: true,
@@ -188,9 +185,10 @@ app.post('/api/notify', async (req, res) => {
   }
 
   try {
-    console.log('[Notification] Using initialized Resend...');
     const resend = new Resend(apiKey);
     
+    // Vercel sometimes has sandbox issues if using the default onboarding@resend.dev email 
+    // to notify people OTHER than the account owner.
     const defaultFrom = 'onboarding@resend.dev';
     const configuredFrom = process.env.VERIFIED_FROM_EMAIL;
     const sanitizeHeader = (str: any) => (typeof str === 'string') ? str.trim().replace(/[^\x00-\x7F]/g, "") : "";
@@ -212,13 +210,15 @@ app.post('/api/notify', async (req, res) => {
       const errorResponse = error as any;
       
       // Handle sandbox/verification restrictions gracefully but clearly
-      if (errorResponse?.statusCode === 403 || errorResponse?.name === 'validation_error') {
+      if (errorResponse?.statusCode === 403 || errorResponse?.name === 'validation_error' || errorResponse?.message?.includes('unauthorized')) {
+        console.warn('[Notification] Email delivery restricted by Resend. Falling back to simulation.');
         return res.json({ 
           success: true, 
           simulated: true,
           warning: 'Resend restricted delivery (likely sandbox limitations)',
           message: errorResponse?.message || 'Email delivery was restricted by Resend. Using simulation.',
-          errorReason: errorResponse?.message
+          errorReason: errorResponse?.message,
+          hint: 'If you are using a new Resend account, you can only send to your own email until you verify a domain or add a verified sender.'
         });
       }
       return res.status(500).json({ success: false, error: errorResponse?.message || 'Email delivery failed' });

@@ -824,8 +824,6 @@ REQFLOW PRO System
         } else {
           query = query.eq('role', UserRole.HOD).eq('department', requisition.department);
         }
-      } else if (nextRole === UserRole.SHOP_HOD) {
-        query = query.or(`role.eq.${UserRole.HOD},role.eq.${UserRole.SHOP_HOD}`).eq('department', Department.SHOP);
       } else if (nextRole === UserRole.IT_HOD) {
         query = query.or(`role.eq.${UserRole.HOD},role.eq.${UserRole.IT_HOD}`).eq('department', Department.IT);
       } else if (nextRole === UserRole.WAREHOUSE_HOD) {

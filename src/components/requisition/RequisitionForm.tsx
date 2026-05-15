@@ -21,6 +21,14 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
   const [items, setItems] = useState<RequisitionItem[]>(
     initialData?.items || [{ description: '', qty: 1, unitCost: 0, totalCost: 0 }]
   );
+
+  const isWrittenToRequired = type !== RequisitionType.SHOP_USE && type !== RequisitionType.WAREHOUSE;
+
+  React.useEffect(() => {
+    if (!isWrittenToRequired) {
+      setWrittenTo('');
+    }
+  }, [type, isWrittenToRequired]);
   const [attachments, setAttachments] = useState<Attachment[]>(initialData?.attachments || []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -93,7 +101,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
 
   const handlePreview = () => {
     // Validate
-    if (!writtenTo.trim()) {
+    if (isWrittenToRequired && !writtenTo.trim()) {
       alert('The "WRITE TO" field is required.');
       return;
     }
@@ -110,7 +118,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
     if (e) e.preventDefault();
     
     // Final validation
-    if (!writtenTo.trim()) {
+    if (isWrittenToRequired && !writtenTo.trim()) {
       alert('The "WRITE TO" field is required.');
       return;
     }
@@ -124,7 +132,6 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
         if (role === UserRole.HOD) {
           if (userDept === Department.IT) return UserRole.IT_HOD;
           if (userDept === Department.WAREHOUSE) return UserRole.WAREHOUSE_HOD;
-          if (userDept === Department.SHOP) return UserRole.SHOP_HOD;
           return UserRole.HOD;
         }
         return role;
@@ -207,10 +214,12 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
           <div className="flex-1 overflow-y-auto p-12 bg-gray-50/50">
             <div className="max-w-3xl mx-auto bg-white shadow-sm border border-gray-100 p-8 space-y-10">
               <div className="flex justify-between items-start border-b border-gray-100 pb-8">
-                <div className="space-y-1">
-                  <p className="text-[10px] uppercase font-black tracking-widest text-gray-400">Destination</p>
-                  <p className="text-xl font-bold text-black uppercase">{writtenTo}</p>
-                </div>
+                {isWrittenToRequired ? (
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase font-black tracking-widest text-gray-400">Destination</p>
+                    <p className="text-xl font-bold text-black uppercase">{writtenTo}</p>
+                  </div>
+                ) : <div />}
                 <div className="text-right space-y-1">
                   <p className="text-[10px] uppercase font-black tracking-widest text-gray-400">Requisition Type</p>
                   <span className="inline-block px-2 py-1 bg-black text-white text-[10px] font-bold uppercase">{type}</span>
@@ -310,16 +319,18 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); handlePreview(); }} className="flex-1 overflow-hidden flex flex-col md:flex-row">
             <div className="flex-1 overflow-y-auto p-8 space-y-8 border-r border-gray-100">
-              <div className="space-y-4">
-                <label className="input-label">WRITE TO: (Destination of funds) <span className="text-red-500">*</span></label>
-                <input 
-                  placeholder="Name of recipient or department receiving funds"
-                  className="w-full px-4 py-3 rounded-sm border border-gray-200 focus:border-black focus:ring-0 text-sm transition-all bg-gray-50/30 font-bold uppercase"
-                  value={writtenTo}
-                  onChange={(e) => setWrittenTo(e.target.value.toUpperCase())}
-                  required
-                />
-              </div>
+              {isWrittenToRequired && (
+                <div className="space-y-4">
+                  <label className="input-label">WRITE TO: (Destination of funds) <span className="text-red-500">*</span></label>
+                  <input 
+                    placeholder="Name of recipient or department receiving funds"
+                    className="w-full px-4 py-3 rounded-sm border border-gray-200 focus:border-black focus:ring-0 text-sm transition-all bg-gray-50/30 font-bold uppercase"
+                    value={writtenTo}
+                    onChange={(e) => setWrittenTo(e.target.value.toUpperCase())}
+                    required
+                  />
+                </div>
+              )}
 
               <div className="space-y-4 pt-4">
                 <div className="flex items-center justify-between">
@@ -580,7 +591,6 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                       if (role === UserRole.HOD) {
                         if (userDept === Department.IT) return UserRole.IT_HOD;
                         if (userDept === Department.WAREHOUSE) return UserRole.WAREHOUSE_HOD;
-                        if (userDept === Department.SHOP) return UserRole.SHOP_HOD;
                         return `HOD (${userDept})`;
                       }
                       return role;

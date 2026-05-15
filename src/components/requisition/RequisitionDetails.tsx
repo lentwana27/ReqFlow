@@ -156,7 +156,6 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     if (targetRole === UserRole.HOD) {
       if (reqDept === Department.IT && userProfile.role === UserRole.IT_HOD) return true;
       if (reqDept === Department.WAREHOUSE && userProfile.role === UserRole.WAREHOUSE_HOD) return true;
-      if (reqDept === Department.SHOP && userProfile.role === UserRole.SHOP_HOD) return true;
       return userProfile.role === UserRole.HOD && userProfile.department === reqDept;
     }
 
@@ -464,10 +463,12 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                 <p className="text-sm font-bold uppercase">{requisition.creatorName}</p>
                 <p className="text-xs text-gray-500 font-mono italic">{requisition.department}</p>
               </div>
-              <div>
-                <label className="input-label">Written To</label>
-                <p className="text-sm font-semibold text-blue-900">{requisition.writtenTo || 'N/A'}</p>
-              </div>
+              {requisition.type !== RequisitionType.SHOP_USE && requisition.type !== RequisitionType.WAREHOUSE && (
+                <div>
+                  <label className="input-label">Written To</label>
+                  <p className="text-sm font-semibold text-blue-900">{requisition.writtenTo || 'N/A'}</p>
+                </div>
+              )}
             </div>
             <div className="text-right space-y-4">
               <div>

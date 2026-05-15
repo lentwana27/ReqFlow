@@ -160,7 +160,6 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
   ],
   [RequisitionType.SHOP_USE]: [
     UserRole.SHOP_MANAGER,
-    UserRole.SHOP_HOD,
     UserRole.OPERATIONS_MANAGER,
     UserRole.FINANCE_HOD
   ],
