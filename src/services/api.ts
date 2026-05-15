@@ -292,12 +292,14 @@ export const authService = {
         .from('profiles')
         .update(updates)
         .eq('uid', user.id)
-        .select()
-        .single();
+        .select();
         
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Profile update failed: result returned 0 rows. You may have insufficient permissions.');
+      }
       
-      const updated = data as UserProfile;
+      const updated = data[0] as UserProfile;
       cachedProfile = updated;
       await localDb.users.put(updated);
       return updated;
@@ -337,11 +339,14 @@ export const userService = {
         .from('profiles')
         .update(updates)
         .eq('uid', uid)
-        .select()
-        .single();
+        .select();
         
       if (error) throw error;
-      const updated = data as UserProfile;
+      if (!data || data.length === 0) {
+        throw new Error(`User with ID ${uid} could not be updated. It may have been deleted or you lack permissions.`);
+      }
+      
+      const updated = data[0] as UserProfile;
       await localDb.users.put(updated);
       return updated;
     } catch (error) {
@@ -409,7 +414,7 @@ export const requisitionService = {
         if (isFinanceOrTreasurer && isApprovedOrProcessed) {
           // If Treasurer, further restrict by allowed types
           if (userProfile.role === UserRole.TREASURER) {
-            const allowedTypes = ['Admin', 'Purchasing', 'Fuel', 'Workshop'];
+            const allowedTypes = ['Admin', 'Purchasing', 'Workshop', 'Fuel'];
             return allowedTypes.includes(req.type as any);
           }
           return true;
@@ -428,9 +433,10 @@ export const requisitionService = {
         .from('requisitions')
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
         
       if (error) throw error;
+      if (!data) throw new Error(`Requisition with ID ${id} not found.`);
       return data as Requisition;
     } catch (error) {
       console.error('Get requisition error:', error);
@@ -446,10 +452,11 @@ export const requisitionService = {
         .from('profiles')
         .select('uid')
         .eq('uid', payload.creatorId)
-        .single();
+        .maybeSingle();
       
-      if (profileCheckError || !profile) {
-        console.error('[Requisition] Creator profile check failed:', profileCheckError);
+      if (profileCheckError) throw profileCheckError;
+      if (!profile) {
+        console.error('[Requisition] Creator profile check failed: No profile found for', payload.creatorId);
         throw new Error(`Your profile (UID: ${payload.creatorId}) was not found in the database. Please try logging out and in again to resync your profile.`);
       }
 
@@ -469,8 +476,7 @@ export const requisitionService = {
       let currentResult = await supabase
         .from('requisitions')
         .insert(insertPayload)
-        .select()
-        .single();
+        .select();
       
       // Recursive safety loop for schema mismatches
       let attempts = 0;
@@ -485,19 +491,24 @@ export const requisitionService = {
           currentResult = await supabase
             .from('requisitions')
             .insert(insertPayload)
-            .select()
-            .single();
+            .select();
         } else {
           break;
         }
       }
 
-      if (currentResult.error) {
-        console.error('[Requisition] Insert error after fallback attempts:', currentResult.error);
-        throw currentResult.error;
+      const { data, error } = currentResult;
+
+      if (error) {
+        console.error('[Requisition] Insert error after fallback attempts:', error);
+        throw error;
       }
       
-      const requisition = currentResult.data as Requisition;
+      if (!data || data.length === 0) {
+        throw new Error('Requisition creation failed: no data returned from database.');
+      }
+
+      const requisition = data[0] as Requisition;
       
       // Notify next approver (Stage 0)
       notificationService.notifyNextApprover(requisition).catch(console.error);
@@ -519,8 +530,7 @@ export const requisitionService = {
         .from('requisitions')
         .update(updatePayload)
         .eq('id', id)
-        .select()
-        .single();
+        .select();
       
       // Recursive safety loop for schema mismatches
       let attempts = 0;
@@ -539,18 +549,22 @@ export const requisitionService = {
             .from('requisitions')
             .update(updatePayload)
             .eq('id', id)
-            .select()
-            .single();
+            .select();
         } else {
           break;
         }
       }
 
-      if (currentResult.error) throw currentResult.error;
+      const { data, error } = currentResult;
+      if (error) throw error;
       
+      if (!data || data.length === 0) {
+        throw new Error('Update failed: no data returned. Requisition might not exist or you lack update permissions.');
+      }
+
       // Merge updates back into the returned data to ensure ephemeral fields (like rejectionReason) 
       // are available for notifications even if they weren't saved to the DB due to schema mismatches
-      const requisition = { ...currentResult.data, ...updates } as Requisition;
+      const requisition = { ...data[0], ...updates } as Requisition;
 
       // If progress happened or status changed to pending, notify next
       // Also notify if status is rejected
@@ -620,7 +634,7 @@ export const notificationService = {
         
         // Treasurer only handles specific types
         if (proc.role === UserRole.TREASURER) {
-          const allowedTypes = ['Admin', 'Purchasing', 'Fuel', 'Workshop'];
+          const allowedTypes = ['Admin', 'Purchasing', 'Workshop', 'Fuel'];
           if (!allowedTypes.includes(requisition.type as any)) continue;
         }
 
@@ -867,7 +881,7 @@ export const auditService = {
         timestamp: new Date().toISOString()
       };
 
-      let currentResult = await supabase.from('activity_logs').insert(entry).select().single();
+      let currentResult = await supabase.from('activity_logs').insert(entry).select();
 
       // Recursive safety loop for schema mismatches
       let attempts = 0;
@@ -882,14 +896,15 @@ export const auditService = {
           delete cleaned[missingColumn];
           entry = cleaned;
           
-          currentResult = await supabase.from('activity_logs').insert(entry).select().single();
+          currentResult = await supabase.from('activity_logs').insert(entry).select();
         } else {
           break;
         }
       }
 
-      if (currentResult.error) throw currentResult.error;
-      return currentResult.data as ActivityLog;
+      const { data, error } = currentResult;
+      if (error) throw error;
+      return (data && data.length > 0) ? (data[0] as ActivityLog) : log;
     } catch (error) {
       console.warn('Audit log write failed:', error);
       return log;

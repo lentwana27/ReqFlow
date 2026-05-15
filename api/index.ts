@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
+import { Resend } from 'resend';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -81,8 +82,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     if (tokenError) throw tokenError;
 
-    const { Resend: ResendClass } = await import('resend');
-    const resend = new ResendClass(resendApiKey.replace(/\s/g, ""));
+    const resend = new Resend(resendApiKey.replace(/\s/g, ""));
     
     let origin = process.env.VITE_APP_URL || req.headers.origin || `https://${req.headers.host}`;
     origin = origin.replace(/\/$/, '');
@@ -188,8 +188,8 @@ app.post('/api/notify', async (req, res) => {
   }
 
   try {
-    const ResendModule = await import('resend');
-    const resend = new ResendModule.Resend(apiKey);
+    console.log('[Notification] Using initialized Resend...');
+    const resend = new Resend(apiKey);
     
     const defaultFrom = 'onboarding@resend.dev';
     const configuredFrom = process.env.VERIFIED_FROM_EMAIL;
@@ -197,26 +197,15 @@ app.post('/api/notify', async (req, res) => {
     
     let fromEmail = sanitizeHeader(configuredFrom || defaultFrom);
     
-    console.log(`[Notification] Sending via Resend from: ${fromEmail}`);
-    console.log(`[Notification] Parameters:`, JSON.stringify({ to: sanitizeHeader(to), subject: sanitizeHeader(subject) }));
+    console.log(`[Notification] Sending to: ${sanitizeHeader(to)} from: ${fromEmail}`);
     
-    let sendResult;
-    try {
-      sendResult = await resend.emails.send({
-        from: fromEmail,
-        to: [sanitizeHeader(to)],
-        cc: cc ? [sanitizeHeader(cc)] : undefined,
-        subject: sanitizeHeader(subject),
-        text: body,
-      });
-    } catch (sendError: any) {
-      console.error('[Notification] resend.emails.send THREW:', sendError);
-      throw new Error(`Resend SDK throw: ${sendError.message || String(sendError)}`);
-    }
-
-    if (!sendResult) throw new Error('Resend returned no result');
-
-    const { data, error } = sendResult;
+    const { data, error } = await resend.emails.send({
+      from: fromEmail,
+      to: [sanitizeHeader(to)],
+      cc: cc ? [sanitizeHeader(cc)] : undefined,
+      subject: sanitizeHeader(subject),
+      text: body,
+    });
 
     if (error) {
       console.error('[Notification] Resend API Error:', JSON.stringify(error, null, 2));

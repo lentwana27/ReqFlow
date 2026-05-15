@@ -2,7 +2,6 @@ export enum RequisitionType {
   ADMIN = 'Admin',
   WAREHOUSE = 'Warehouse',
   PURCHASING = 'Purchasing',
-  FUEL = 'Fuel',
   SHOP_USE = 'Shop Use',
   SHOP_QR = 'Shop QR',
   WAREHOUSE_QR = 'Warehouse QR',
@@ -12,7 +11,8 @@ export enum RequisitionType {
   OPERATIONS = 'Operations',
   IT = 'IT',
   CAR_MAINTENANCE = 'Car Maintenance',
-  QUOTATIONS = 'Quotations'
+  QUOTATIONS = 'Quotations',
+  FUEL = 'Fuel'
 }
 
 export enum UserRole {
@@ -20,11 +20,11 @@ export enum UserRole {
   HOD = 'Head of Department',
   PURCHASING_HOD = 'Purchasing HOD',
   FINANCE_HOD = 'Finance HOD',
-  ACCOUNTING_HOD = 'Accounting HOD',
   OPERATIONS_MANAGER = 'Operations Manager',
   DIRECTOR = 'Director',
   ADMIN = 'System Administrator',
   SHOP_SUPERVISOR = 'Shop Supervisor',
+  SHOP_MANAGER = 'Shop Manager',
   SHOP_HOD = 'Shop Head of Department',
   IT_HOD = 'IT HOD',
   WAREHOUSE_HOD = 'Warehouse HOD',
@@ -40,7 +40,8 @@ export enum Department {
   WAREHOUSE = 'Warehouse',
   SHOP = 'Shop',
   WORKSHOP = 'Workshop',
-  FUEL = 'Fuel',
+  SECURITY = 'Security',
+  DRIVER = 'Driver',
   AUDIT = 'Audit'
 }
 
@@ -151,12 +152,8 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
     UserRole.OPERATIONS_MANAGER,
     UserRole.FINANCE_HOD
   ],
-  [RequisitionType.FUEL]: [
-    UserRole.FINANCE_HOD,
-    UserRole.DIRECTOR
-  ],
   [RequisitionType.SHOP_USE]: [
-    UserRole.SHOP_SUPERVISOR,
+    UserRole.SHOP_MANAGER,
     UserRole.SHOP_HOD,
     UserRole.OPERATIONS_MANAGER,
     UserRole.FINANCE_HOD
@@ -186,7 +183,7 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
   ],
   [RequisitionType.OPERATIONS]: [
     UserRole.OPERATIONS_MANAGER,
-    UserRole.ACCOUNTING_HOD,
+    UserRole.FINANCE_HOD,
     UserRole.DIRECTOR
   ],
   [RequisitionType.IT]: [
@@ -198,6 +195,9 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
   [RequisitionType.CAR_MAINTENANCE]: [
     UserRole.FINANCE_HOD,
     UserRole.DIRECTOR
+  ],
+  [RequisitionType.FUEL]: [
+    UserRole.FINANCE_HOD
   ],
   [RequisitionType.QUOTATIONS]: []
 };

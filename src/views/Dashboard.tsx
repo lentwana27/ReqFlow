@@ -413,7 +413,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            {[UserRole.FINANCE_HOD, UserRole.DIRECTOR, UserRole.ADMIN, UserRole.TREASURER, UserRole.ACCOUNTING_HOD].includes(userProfile.role) && (
+            {[UserRole.FINANCE_HOD, UserRole.DIRECTOR, UserRole.ADMIN, UserRole.TREASURER].includes(userProfile.role) && (
               <>
                 <button 
                   onClick={handleExportPDF}

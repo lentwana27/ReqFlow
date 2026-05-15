@@ -71,13 +71,13 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
   };
 
   const canDownload = () => {
-    // Admin, Treasurer, Director, and Accounting HOD can always download
+    // Admin, Treasurer, Director, and Finance HOD can always download
     if (
       userProfile.username === 'admin' || 
       userProfile.role === UserRole.ADMIN || 
       userProfile.role === UserRole.TREASURER ||
       userProfile.role === UserRole.DIRECTOR ||
-      userProfile.role === UserRole.ACCOUNTING_HOD
+      userProfile.role === UserRole.FINANCE_HOD
     ) return true;
     
     // Any one in the workflow can download (Approvers)
@@ -106,9 +106,24 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
   };
 
   const checkRoleMatch = (userProfile: UserProfile, targetRole: string, reqDept: Department) => {
-    // In the new spec, roles are specific and don't strictly require dept matching in logic
-    // because the role string itself (e.g. "Purchasing HOD") describes the authority.
-    return userProfile.role === targetRole;
+    if (userProfile.username === 'admin') return true;
+    
+    // Explicit match
+    if (userProfile.role === targetRole) return true;
+
+    // Backward compatibility for old requisitions created before recent role changes
+    if (targetRole === 'Accounting HOD' && userProfile.role === UserRole.FINANCE_HOD) return true;
+    if (targetRole === 'Shop Supervisor' && userProfile.role === UserRole.SHOP_MANAGER) return true;
+
+    // Resolve generic HOD to department-specific HOD
+    if (targetRole === UserRole.HOD) {
+      if (reqDept === Department.IT && userProfile.role === UserRole.IT_HOD) return true;
+      if (reqDept === Department.WAREHOUSE && userProfile.role === UserRole.WAREHOUSE_HOD) return true;
+      if (reqDept === Department.SHOP && userProfile.role === UserRole.SHOP_HOD) return true;
+      return userProfile.role === UserRole.HOD && userProfile.department === reqDept;
+    }
+
+    return false;
   };
 
   const canApprove = () => {
@@ -269,7 +284,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
   const isFinance = userProfile?.role === UserRole.FINANCE_HOD;
   const isTreasurer = userProfile?.role === UserRole.TREASURER;
   
-  // Treasurer issues for Admin, Fuel, Workshop. others might be Finance or generic
+  // Treasurer issues for Admin, Workshop, Fuel. others might be Finance or generic
   const canProcess = (isTreasurer || isFinance) && requisition.status === 'approved';
 
   const currency = requisition.currency || Currency.USD;
