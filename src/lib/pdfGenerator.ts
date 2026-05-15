@@ -63,6 +63,13 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   doc.setFont('', 'normal');
   doc.text(requisition.status.toUpperCase(), pageWidth - 45, 52);
 
+  if (requisition.processedNumber) {
+    doc.setFont('', 'bold');
+    doc.text('Processed No:', pageWidth - 80, 59);
+    doc.setFont('', 'normal');
+    doc.text(requisition.processedNumber, pageWidth - 45, 59);
+  }
+
   // Rejection Reason if it exists
   if (requisition.status === 'rejected' && requisition.rejectionReason) {
     doc.setFont('', 'bold');

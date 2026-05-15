@@ -225,11 +225,19 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
           }
 
           if (nextStep >= newApprovals.length) {
-          updates.status = 'approved'; // This will be displayed as "Completed"
-          updates.currentStage = newApprovals.length - 1;
-        } else {
-          updates.currentStage = nextStep;
-        }
+            updates.status = 'approved'; // This will be displayed as "Completed"
+            updates.currentStage = newApprovals.length - 1;
+            // Add processors to involvedRoles to grant them RLS update permissions
+            updates.involvedRoles = Array.from(new Set([
+              ...(requisition.involvedRoles || []),
+              UserRole.TREASURER,
+              UserRole.FINANCE_HOD,
+              UserRole.ADMIN,
+              UserRole.DIRECTOR
+            ]));
+          } else {
+            updates.currentStage = nextStep;
+          }
         }
       } else if (newStatus === 'processed') {
         const sigId = `SIG-DISB-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
@@ -340,6 +348,9 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                   {requisition.type === 'Quotations' ? requisition.type : `${requisition.type} Requisition`}
                 </p>
                 <span className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded-sm font-bold text-gray-600">#{requisition.sequenceNumber || '---'}</span>
+                {requisition.processedNumber && (
+                  <span className="text-[10px] bg-green-100 px-1.5 py-0.5 rounded-sm font-bold text-green-700">PROC: {requisition.processedNumber}</span>
+                )}
               </div>
             </div>
           </div>

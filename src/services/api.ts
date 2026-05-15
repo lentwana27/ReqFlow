@@ -461,14 +461,21 @@ export const requisitionService = {
     try {
       console.log('[Requisition] Creating...', payload);
       
-      // 1. Get sequence number (get total count + 1)
-      const { count, error: countError } = await supabase
-        .from('requisitions')
-        .select('*', { count: 'exact', head: true });
-      
-      if (countError) console.warn('Could not fetch count for sequence number:', countError);
-      const nextSeq = (count || 0) + 1;
-      const sequenceNumber = nextSeq.toString().padStart(3, '0');
+      // 1. Get sequence number (Get highest existing and increment)
+      let sequenceNumber = '001';
+      try {
+        const { data: latest } = await supabase
+          .from('requisitions')
+          .select('sequenceNumber')
+          .order('createdAt', { ascending: false })
+          .limit(1);
+        
+        const lastSeq = latest && latest[0] ? parseInt(latest[0].sequenceNumber) : 0;
+        const nextSeq = (isNaN(lastSeq) ? 0 : lastSeq) + 1;
+        sequenceNumber = nextSeq.toString().padStart(3, '0');
+      } catch (e) {
+        console.warn('[Requisition] Could not fetch sequenceNumber (column might be missing):', e);
+      }
 
       // 2. Random Requisition Number if not provided or to ensure randomness
       const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -550,6 +557,30 @@ export const requisitionService = {
   },
   update: async (id: string, updates: Partial<Requisition>) => {
     try {
+      // If status is becoming 'processed', assign a processedNumber if not already set
+      if (updates.status === 'processed') {
+        try {
+          const { data: latestProcessed } = await supabase
+            .from('requisitions')
+            .select('processedNumber')
+            .eq('status', 'processed')
+            .order('updatedAt', { ascending: false })
+            .limit(1);
+          
+          const lastProcNumStr = latestProcessed && latestProcessed[0] ? latestProcessed[0].processedNumber : null;
+          let lastProcNum = 0;
+          if (lastProcNumStr && lastProcNumStr.startsWith('CMP-')) {
+            lastProcNum = parseInt(lastProcNumStr.replace('CMP-', '')) || 0;
+          }
+
+          const nextProc = lastProcNum + 1;
+          updates.processedNumber = `CMP-${nextProc.toString().padStart(3, '0')}`;
+          console.log(`[Requisition] Assigning Processed Number: ${updates.processedNumber}`);
+        } catch (e) {
+          console.warn('[Requisition] Could not fetch processedNumber (column might be missing):', e);
+        }
+      }
+
       let updatePayload: any = {
         ...updates,
         updatedAt: new Date().toISOString()

@@ -93,6 +93,7 @@ export interface Requisition {
   id: string;
   requisitionNumber: string;
   sequenceNumber: string;
+  processedNumber?: string;
   type: RequisitionType;
   creatorId: string;
   creatorName: string;

@@ -211,7 +211,13 @@ export default function Dashboard({ userProfile }: DashboardProps) {
         ...data,
         creatorId: userProfile.uid,
         creatorName: userProfile.name,
-        involvedRoles: Array.from(new Set(data.approvals.map((a: any) => a.role))),
+        involvedRoles: Array.from(new Set([
+          ...data.approvals.map((a: any) => a.role),
+          UserRole.TREASURER,
+          UserRole.FINANCE_HOD,
+          UserRole.ADMIN,
+          UserRole.DIRECTOR
+        ])),
         updatedAt: now,
       };
 
@@ -524,11 +530,18 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                       ) : '...'}
                     </td>
                     <td className="px-2 py-2">
-                      <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-sm ${getStatusColor(req.status)}`}>
-                        {req.status === 'approved' ? 'Completed' : 
-                         req.status === 'processed' ? 'Issued' : 
-                         req.status}
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-sm ${getStatusColor(req.status)}`}>
+                          {req.status === 'approved' ? 'Completed' : 
+                           req.status === 'processed' ? 'Issued' : 
+                           req.status}
+                        </span>
+                        {req.processedNumber && (
+                          <span className="text-[9px] font-mono font-bold text-green-700 bg-green-50 px-1 border border-green-100 rounded-sm">
+                            {req.processedNumber}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1">
