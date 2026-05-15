@@ -390,16 +390,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                            requisition.status === 'processed' && 
                            requisition.returnStatus === 'pending';
 
-  // Treasurer issues specifically for these types as per user request
-  const treasurerAllowedTypes = [
-    RequisitionType.ADMIN, 
-    RequisitionType.PURCHASING, 
-    RequisitionType.WORKSHOP, 
-    RequisitionType.FUEL, 
-    RequisitionType.FINANCE
-  ];
-  
-  const canProcess = isTreasurer && treasurerAllowedTypes.includes(requisition.type as any) && requisition.status === 'approved';
+  const canProcess = isTreasurer && requisition.status === 'approved';
 
   const currency = requisition.currency || Currency.USD;
   const symbol = currency === Currency.USD ? '$' : '';
