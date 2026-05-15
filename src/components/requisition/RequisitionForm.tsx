@@ -395,9 +395,10 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                           <div className="flex items-center gap-1">
                             <input 
                               type="number"
+                              step="any"
                               className="w-full bg-transparent text-sm focus:outline-none"
                               value={item.qty}
-                              onChange={(e) => updateItem(idx, 'qty', parseInt(e.target.value) || 0)}
+                              onChange={(e) => updateItem(idx, 'qty', parseFloat(e.target.value) || 0)}
                             />
                             {isFuel && <span className="text-[10px] text-gray-400 font-bold">L</span>}
                           </div>
@@ -419,6 +420,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                             <div className="col-span-2">
                               <input 
                                 type="number"
+                                step="any"
                                 className="w-full bg-transparent text-sm focus:outline-none"
                                 value={item.unitCost}
                                 onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
