@@ -24,6 +24,8 @@ CREATE TABLE public.profiles (
 CREATE TABLE public.requisitions (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "requisitionNumber" TEXT NOT NULL,
+  "sequenceNumber" TEXT, -- Added
+  "processedNumber" TEXT, -- Added
   "type" TEXT NOT NULL,
   "creatorId" UUID REFERENCES public.profiles("uid") ON DELETE CASCADE NOT NULL,
   "creatorName" TEXT NOT NULL,
@@ -56,7 +58,8 @@ CREATE TABLE public.activity_logs (
   "target" TEXT,
   "details" TEXT,
   "requisitionId" UUID REFERENCES public.requisitions("id") ON DELETE CASCADE,
-  "userId" UUID REFERENCES public.profiles("uid") ON DELETE CASCADE
+  "userId" UUID REFERENCES public.profiles("uid") ON DELETE CASCADE,
+  "department" TEXT -- Added
 );
 
 -- 4. Password Recovery Tokens (For manual recovery link flow)
@@ -83,12 +86,12 @@ CREATE POLICY "Users can insert their own profile." ON public.profiles
 CREATE POLICY "Users and admins can update profiles." ON public.profiles
   FOR UPDATE USING (
     auth.uid() = "uid" OR 
-    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" = 'System Administrator')
+    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin'))
   );
 
 CREATE POLICY "Admins can delete profiles." ON public.profiles
   FOR DELETE USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" = 'System Administrator')
+    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin'))
   );
 
 -- Requisitions Policies
@@ -99,7 +102,7 @@ CREATE POLICY "Users and admins can view relevant requisitions." ON public.requi
   FOR SELECT USING (
     auth.uid() = "creatorId" OR 
     (SELECT "role" FROM public.profiles WHERE "uid" = auth.uid()) = ANY("involvedRoles") OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" = 'System Administrator')
+    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin', 'Director', 'Treasurer', 'Finance HOD'))
   );
 
 CREATE POLICY "Users can create requisitions." ON public.requisitions
@@ -109,13 +112,18 @@ CREATE POLICY "Users and admins can update requisitions." ON public.requisitions
   FOR UPDATE USING (
     (auth.uid() = "creatorId" AND "status" = 'pending') OR
     (SELECT "role" FROM public.profiles WHERE "uid" = auth.uid()) = ANY("involvedRoles") OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" = 'System Administrator')
+    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin')) OR
+    (
+      -- Specifically allow Treasurer and Finance HOD to update 'approved' requisitions to 'processed'
+      (SELECT "role" FROM public.profiles WHERE "uid" = auth.uid()) IN ('Treasurer', 'Finance HOD') 
+      AND "status" = 'approved'
+    )
   );
 
 CREATE POLICY "Admins and creators can delete requisitions." ON public.requisitions
   FOR DELETE USING (
     (auth.uid() = "creatorId" AND "status" = 'pending') OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" = 'System Administrator')
+    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin'))
   );
 
 -- Logs Policies

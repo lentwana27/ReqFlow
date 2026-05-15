@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { requisitionService, auditService } from '../../services/api';
 import { Requisition, UserProfile, UserRole, Department, RequisitionType, Attachment, Currency } from '../../types';
 import { X, Check, XCircle, Clock, ArrowRight, Shield, Download, Loader2, AlertCircle, Lock, Paperclip, Eye, FileText, Image as ImageIcon } from 'lucide-react';
@@ -26,6 +26,43 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
   const [isSuccess, setIsSuccess] = useState(false);
 
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Silent repair for involvedRoles on old requisitions
+  useEffect(() => {
+    const repairInvolvedRoles = async () => {
+      const isSystemAdmin = userProfile.username === 'admin' || userProfile.role === UserRole.ADMIN;
+      const isCurrentlyInvolved = requisition.involvedRoles?.includes(userProfile.role);
+      
+      if (!(isSystemAdmin || isCurrentlyInvolved)) return;
+
+      const mandatoryRoles = [
+        UserRole.TREASURER, 'Treasurer', 'TREASURER',
+        UserRole.FINANCE_HOD, 'Finance HOD', 'FINANCE_HOD', 'Accounting HOD', 'ACCOUNTING_HOD',
+        UserRole.ADMIN, 'System Administrator', 'ADMIN',
+        UserRole.DIRECTOR, UserRole.DIRECTOR_2, 'Director', 'Director 2', 'DIRECTOR'
+      ];
+      
+      const missingRoles = mandatoryRoles.filter(r => !requisition.involvedRoles?.includes(r));
+      
+      if (missingRoles.length > 0) {
+        console.log('[Requisition] Repairing involvedRoles (missing):', missingRoles);
+        const newRoles = Array.from(new Set([
+          ...(requisition.involvedRoles || []),
+          ...mandatoryRoles
+        ])).filter(r => typeof r === 'string');
+        
+        try {
+          await requisitionService.update(requisition.id, { involvedRoles: newRoles });
+        } catch (e) {
+          console.warn('[Requisition] Silent repair failed:', e);
+        }
+      }
+    };
+
+    if (requisition.id && userProfile) {
+      repairInvolvedRoles();
+    }
+  }, [requisition.id, userProfile]);
 
   const canDelete = () => {
     const isSystemAdmin = userProfile.username === 'admin' || userProfile.role === UserRole.ADMIN;
@@ -215,6 +252,27 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
         }
 
         updates.approvals = newApprovals;
+        
+        // Always ensure mandatory roles are in involvedRoles on every approval update
+        updates.involvedRoles = Array.from(new Set([
+          ...(requisition.involvedRoles || []),
+          UserRole.TREASURER,
+          'Treasurer',
+          'TREASURER',
+          UserRole.FINANCE_HOD,
+          'Finance HOD',
+          'FINANCE_HOD',
+          'Accounting HOD',
+          'ACCOUNTING_HOD',
+          UserRole.ADMIN,
+          'System Administrator',
+          'ADMIN',
+          UserRole.DIRECTOR,
+          UserRole.DIRECTOR_2,
+          'Director',
+          'Director 2',
+          'DIRECTOR'
+        ])).filter(role => typeof role === 'string');
 
         if (newStatus === 'rejected') {
           updates.status = 'rejected';
@@ -227,14 +285,6 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
           if (nextStep >= newApprovals.length) {
             updates.status = 'approved'; // This will be displayed as "Completed"
             updates.currentStage = newApprovals.length - 1;
-            // Add processors to involvedRoles to grant them RLS update permissions
-            updates.involvedRoles = Array.from(new Set([
-              ...(requisition.involvedRoles || []),
-              UserRole.TREASURER,
-              UserRole.FINANCE_HOD,
-              UserRole.ADMIN,
-              UserRole.DIRECTOR
-            ]));
           } else {
             updates.currentStage = nextStep;
           }
@@ -315,11 +365,25 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     }
   };
 
-  const isFinance = userProfile?.role === UserRole.FINANCE_HOD;
-  const isTreasurer = userProfile?.role === UserRole.TREASURER;
+  const userRole = userProfile?.role as string;
+  const isFinance = userRole === UserRole.FINANCE_HOD || userRole === 'Finance HOD' || userRole === 'FINANCE_HOD' || userRole === 'Accounting HOD';
+  const isTreasurer = userRole === UserRole.TREASURER || userRole === 'Treasurer' || userRole === 'TREASURER';
+  const isSystemAdmin = userProfile?.username === 'admin' || userRole === UserRole.ADMIN || userRole === 'System Administrator' || userRole === 'ADMIN';
+
+  // Treasurer issues specifically for these types as per user request
+  const treasurerAllowedTypes = [
+    RequisitionType.ADMIN, 
+    RequisitionType.PURCHASING, 
+    RequisitionType.WORKSHOP, 
+    RequisitionType.FUEL, 
+    RequisitionType.FINANCE
+  ];
   
-  // Treasurer issues for Admin, Workshop, Fuel. others might be Finance or generic
-  const canProcess = (isTreasurer || isFinance) && requisition.status === 'approved';
+  const canProcess = (
+    (isTreasurer && treasurerAllowedTypes.includes(requisition.type as any)) || 
+    isFinance || 
+    isSystemAdmin
+  ) && requisition.status === 'approved';
 
   const currency = requisition.currency || Currency.USD;
   const symbol = currency === Currency.USD ? '$' : '';

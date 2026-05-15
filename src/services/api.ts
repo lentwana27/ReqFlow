@@ -501,10 +501,38 @@ export const requisitionService = {
         return cleaned;
       };
 
+      // 4. Ensure involvedRoles is comprehensive
+      const workflowRoles = payload.approvals?.map((a: any) => a.role) || [];
+      const mandatoryRoles = [
+        UserRole.TREASURER,
+        'Treasurer',
+        'TREASURER',
+        UserRole.FINANCE_HOD,
+        'Finance HOD',
+        'FINANCE_HOD',
+        'Accounting HOD',
+        'ACCOUNTING_HOD',
+        UserRole.ADMIN,
+        'System Administrator',
+        'ADMIN',
+        UserRole.DIRECTOR,
+        UserRole.DIRECTOR_2,
+        'Director',
+        'Director 2',
+        'DIRECTOR'
+      ];
+      
+      const involvedRoles = Array.from(new Set([
+        ...workflowRoles,
+        ...mandatoryRoles,
+        payload.creatorId // Also keep UIDs if any
+      ])).filter(role => typeof role === 'string' || typeof role === 'number'); 
+
       let insertPayload = {
         ...payload,
         requisitionNumber,
         sequenceNumber,
+        involvedRoles,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

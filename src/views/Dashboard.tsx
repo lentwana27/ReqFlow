@@ -214,10 +214,22 @@ export default function Dashboard({ userProfile }: DashboardProps) {
         involvedRoles: Array.from(new Set([
           ...data.approvals.map((a: any) => a.role),
           UserRole.TREASURER,
+          'Treasurer',
+          'TREASURER',
           UserRole.FINANCE_HOD,
+          'Finance HOD',
+          'FINANCE_HOD',
+          'Accounting HOD',
+          'ACCOUNTING_HOD',
           UserRole.ADMIN,
-          UserRole.DIRECTOR
-        ])),
+          'System Administrator',
+          'ADMIN',
+          UserRole.DIRECTOR,
+          UserRole.DIRECTOR_2,
+          'Director',
+          'Director 2',
+          'DIRECTOR'
+        ])).filter(role => typeof role === 'string'),
         updatedAt: now,
       };
 
