@@ -1,12 +1,40 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Increase limit for logo upload
 
 // --- ROUTES ---
+
+// Logo Upload
+app.post('/api/upload-logo', async (req, res) => {
+  const { logoData } = req.body;
+  if (!logoData) {
+    return res.status(400).json({ error: 'No logo data provided' });
+  }
+
+  try {
+    const base64Data = logoData.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    const publicDir = path.join(process.cwd(), 'public');
+    if (!fs.existsSync(publicDir)) {
+      fs.mkdirSync(publicDir, { recursive: true });
+    }
+
+    const logoPath = path.join(publicDir, 'logo.png');
+    fs.writeFileSync(logoPath, buffer);
+    
+    console.log('[Branding] Logo updated at:', logoPath);
+    res.json({ success: true, message: 'Logo updated successfully' });
+  } catch (err: any) {
+    console.error('[Branding] Upload error:', err);
+    res.status(500).json({ error: 'Failed to save logo file: ' + err.message });
+  }
+});
 
 // Health check
 app.get('/api/health', (req, res) => {

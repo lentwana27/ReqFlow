@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { userService, requisitionService, auditService, authService } from '../services/api';
+import { userService, requisitionService, auditService, authService, brandingService } from '../services/api';
 import { UserProfile, UserRole, Department, ROLES, DEPARTMENTS } from '../types';
 import {
   Users, CheckCircle2, XCircle, Search, Loader2,
   Lock, ArrowLeft, AlertCircle, RefreshCw, KeyRound,
-  Download, Calendar, Filter
+  Download, Calendar, Filter, Image as ImageIcon, Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from '../context/ToastContext';
@@ -22,7 +22,7 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'unverified' | 'verified'>('all');
-  const [activeTab, setActiveTab] = useState<'users' | 'requisitions' | 'audit'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'requisitions' | 'audit' | 'branding'>('users');
   const [requisitions, setRequisitions] = useState<any[]>([]);
 
   // Requisition Filters
@@ -451,7 +451,7 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
 
           {/* Tab switcher */}
           <div className="flex bg-white border border-gray-200 p-1 rounded-sm gap-1">
-            {(['users', 'requisitions', 'audit'] as const).map((tab) => (
+            {(['users', 'requisitions', 'audit', 'branding'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -815,6 +815,79 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
                   ))}
                 </tbody>
               </table>
+            </div>
+          </motion.div>
+        ) : activeTab === 'branding' ? (
+          <motion.div key="branding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-2xl mx-auto py-8">
+            <div className="bg-white border border-gray-100 rounded-sm p-8 shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <ImageIcon className="w-6 h-6 text-black" />
+                <h3 className="text-lg font-bold">System Branding</h3>
+              </div>
+              
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Company Logo (PDF Header)</label>
+                  <p className="text-xs text-gray-500 mb-4">
+                    Upload a PNG logo for the PDF requisitions. Recommended size: Wide aspect (e.g., 400x150px).
+                  </p>
+                  
+                  <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-lg p-10 bg-gray-50 hover:bg-gray-100 transition-colors group relative cursor-pointer">
+                    <input 
+                      type="file" 
+                      accept="image/png, image/jpeg" 
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        
+                        const reader = new FileReader();
+                        reader.onload = async (event) => {
+                          const base64 = event.target?.result as string;
+                          try {
+                            setLoading(true);
+                            await brandingService.uploadLogo(base64);
+                            showToast('Logo updated successfully! Changes will take effect on new PDFs.');
+                            
+                            // Log the change
+                            await auditService.log({
+                              action: 'UPDATE_BRANDING',
+                              module: 'SYSTEM',
+                              details: 'Updated company logo',
+                              user: userProfile?.name || 'Admin'
+                            });
+                          } catch (err: any) {
+                            showToast(err.message || 'Failed to upload logo', 'error');
+                          } finally {
+                            setLoading(false);
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                    <Upload className="w-10 h-10 text-gray-300 group-hover:text-black transition-colors mb-3" />
+                    <p className="text-sm font-bold text-gray-600 group-hover:text-black">Click to upload logo.png</p>
+                    <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight">PNG or JPEG • Max 10MB</p>
+                  </div>
+                </div>
+                
+                <div className="pt-4 border-t border-gray-100">
+                  <h4 className="text-sm font-bold mb-2">Current Logo Preview</h4>
+                  <div className="bg-gray-50 p-4 rounded border border-gray-100 flex items-center justify-center">
+                    <img 
+                      src={`/logo.png?v=${Date.now()}`} 
+                      alt="Current Logo" 
+                      className="max-h-24 object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://placehold.co/400x150?text=No+Logo+Uploaded';
+                      }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-2 italic text-center">
+                    Note: If the preview shows a placeholder, it means logo.png is not yet uploaded to the public directory.
+                  </p>
+                </div>
+              </div>
             </div>
           </motion.div>
         ) : (

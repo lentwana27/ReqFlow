@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { requisitionService, auditService } from '../services/api';
-import { UserProfile, Requisition, UserRole, REQUISITION_WORKFLOWS, RequisitionType, Currency } from '../types';
+import { UserProfile, Requisition, UserRole, REQUISITION_WORKFLOWS, RequisitionType, Currency, Department } from '../types';
 import RequisitionForm from '../components/requisition/RequisitionForm';
 import { Plus, Search, ArrowUpRight, CheckCircle2, Clock, XCircle, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -17,6 +17,8 @@ export default function Dashboard({ userProfile }: DashboardProps) {
   const { showToast } = useToast();
   const [requisitions, setRequisitions] = useState<Requisition[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
+  const [selectedType, setSelectedType] = useState<RequisitionType | null>(null);
   const [editingReq, setEditingReq] = useState<Requisition | null>(null);
   const [selectedReq, setSelectedReq] = useState<Requisition | null>(null);
   const [loading, setLoading] = useState(true);
@@ -333,7 +335,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
         </div>
         <button 
           id="new-req-btn"
-          onClick={() => setShowForm(true)}
+          onClick={() => setShowTypeSelector(true)}
           className="btn-primary flex items-center gap-2 h-12 px-6"
         >
           <Plus className="w-4 h-4" /> Write Requisition
@@ -636,14 +638,74 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       </div>
 
       <AnimatePresence>
+        {showTypeSelector && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white rounded-sm shadow-2xl w-full max-w-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="text-lg font-bold uppercase tracking-tight">Select Requisition Type</h3>
+                <button onClick={() => setShowTypeSelector(false)} className="text-gray-400 hover:text-black transition-colors">
+                  <Plus className="w-5 h-5 rotate-45" />
+                </button>
+              </div>
+              <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto">
+                {Object.values(RequisitionType).map((t) => {
+                  let isAllowed = true;
+                  let restrictionMsg = '';
+
+                  if (t === RequisitionType.PURCHASING || t === RequisitionType.PROJECTS) {
+                    isAllowed = userProfile.department === Department.PURCHASING;
+                    restrictionMsg = 'Purchasing Dept Only';
+                  } else if (t === RequisitionType.IT) {
+                    isAllowed = userProfile.department === Department.IT;
+                    restrictionMsg = 'IT Dept Only';
+                  } else if (t === RequisitionType.FINANCE) {
+                    isAllowed = userProfile.department === Department.FINANCE;
+                    restrictionMsg = 'Finance Dept Only';
+                  }
+
+                  return (
+                    <button
+                      key={t}
+                      disabled={!isAllowed}
+                      onClick={() => {
+                        setSelectedType(t);
+                        setShowTypeSelector(false);
+                        setShowForm(true);
+                      }}
+                      className={`text-left p-4 rounded-sm border transition-all flex flex-col gap-1 ${
+                        isAllowed 
+                          ? 'border-gray-200 hover:border-black bg-white hover:shadow-md' 
+                          : 'border-gray-100 bg-gray-50 opacity-40 cursor-not-allowed'
+                      }`}
+                    >
+                      <span className="text-xs font-bold uppercase tracking-tight text-gray-900">{t}</span>
+                      {!isAllowed && <span className="text-[9px] font-black text-red-500 uppercase">{restrictionMsg}</span>}
+                      {isAllowed && <span className="text-[9px] text-gray-400">Next: Fill details & items</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end">
+                <button onClick={() => setShowTypeSelector(false)} className="px-6 py-2 text-xs font-bold uppercase text-gray-500 hover:text-black">Close</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
         {showForm && userProfile && (
           <RequisitionForm 
             userDept={userProfile.department}
             userEmail={userProfile.username || userProfile.email}
             initialData={editingReq || undefined}
+            fixedType={editingReq ? undefined : (selectedType || undefined)}
             onClose={() => {
               setShowForm(false);
               setEditingReq(null);
+              setSelectedType(null);
             }}
             onSubmit={handleSubmitRequisition}
           />

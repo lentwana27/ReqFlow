@@ -10,7 +10,8 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   const pageWidth = doc.internal.pageSize.width;
 
   const headerY = 20;
-  let textStartY = 35;
+  let textStartY = 15;
+  const isQuotation = requisition.type === 'Quotations';
 
   // Logo Support: The user can upload logo.png to /public/
   try {
@@ -26,98 +27,138 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
     const logo = await loadImg('/logo.png');
     if (logo) {
       const aspect = logo.width / logo.height;
-      const width = 80;
+      const width = 60;
       const height = width / aspect;
-      doc.addImage(logo, 'PNG', (pageWidth - width) / 2, 8, width, height);
-      textStartY = height + 15;
+      doc.addImage(logo, 'PNG', 14, 8, width, height);
+      textStartY = Math.max(textStartY, height + 15);
     }
   } catch (e) {
     console.log('No logo found at /logo.png');
   }
 
-  // Only show the text brand if no logo or if user specifically wants it.
-  // Given the logo has the name, let's just show 'INTERNAL REQUISITION' if logo exists,
-  // or show both if no logo.
-  doc.setFontSize(24);
-  doc.setTextColor(0, 51, 102);
-  doc.setFont('', 'bold');
-  
-  // If logo exists, maybe we don't need the big text header? 
-  // Let's keep it but move it down if logo is present.
-  doc.text('MINEAZY MINING SOLUTIONS', pageWidth / 2, textStartY, { align: 'center' });
+  if (isQuotation) {
+    doc.setFontSize(22);
+    doc.setTextColor(0, 51, 102);
+    doc.setFont('', 'bold');
+    doc.text('QUOTATION', pageWidth - 14, 20, { align: 'right' });
 
-  doc.setFontSize(14);
-  doc.setTextColor(100, 100, 100);
-  doc.setFont('', 'normal');
-  doc.text('INTERNAL REQUISITION', pageWidth / 2, textStartY + 8, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setTextColor(80, 80, 80);
+    doc.setFont('', 'normal');
+    doc.text('Address: 15 Unit Plumtree Road, Bulawayo', pageWidth - 14, 28, { align: 'right' });
+    doc.text('Contact: 0712290046', pageWidth - 14, 33, { align: 'right' });
+    doc.text('Email: sales@mineazy.co.zw', pageWidth - 14, 38, { align: 'right' });
+    textStartY = Math.max(textStartY, 45);
+  } else {
+    doc.setFontSize(18);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont('', 'bold');
+    doc.text('INTERNAL REQUISITION', pageWidth - 14, 20, { align: 'right' });
+    textStartY = Math.max(textStartY, 35);
+  }
 
   // Divider
   doc.setDrawColor(230, 230, 230);
-  doc.line(14, 35, pageWidth - 14, 35);
+  doc.line(14, textStartY, pageWidth - 14, textStartY);
 
   // Info Section
   doc.setFontSize(10);
   doc.setTextColor(26, 26, 26);
-  doc.setFont('', 'bold');
-  doc.text('Requisition Number:', 14, 45);
-  doc.setFont('', 'normal');
-  doc.text(requisition.requisitionNumber, 55, 45);
 
-  doc.setFont('', 'bold');
-  doc.text('Sequence Number:', 14, 52);
-  doc.setFont('', 'normal');
-  doc.text(requisition.sequenceNumber || 'N/A', 55, 52);
-
-  doc.setFont('', 'bold');
-  doc.text('Department:', 14, 59);
-  doc.setFont('', 'normal');
-  doc.text(requisition.department, 55, 59);
-
-  doc.setFont('', 'bold');
-  doc.text('Requested By:', 14, 66);
-  doc.setFont('', 'normal');
-  doc.text(requisition.creatorName, 55, 66);
-
-  doc.setFont('', 'bold');
-  doc.text('Written To:', 14, 73);
-  doc.setFont('', 'normal');
-  doc.text(requisition.writtenTo || 'N/A', 55, 73);
-
-  doc.setFont('', 'bold');
-  doc.text('Date Created:', pageWidth - 80, 45);
-  doc.setFont('', 'normal');
-  
-  const createdDate = requisition.createdAt ? (typeof requisition.createdAt === 'string' ? parseISO(requisition.createdAt) : (requisition.createdAt as any).toDate?.() || new Date(requisition.createdAt as any)) : new Date();
-  doc.text(format(createdDate, 'PPP p'), pageWidth - 45, 45);
-
-  doc.setFont('', 'bold');
-  doc.text('Status:', pageWidth - 80, 52);
-  doc.setFont('', 'normal');
-  doc.text(requisition.status.toUpperCase(), pageWidth - 45, 52);
-
-  if (requisition.processedNumber) {
+  if (isQuotation) {
+    // STRICTOR INFO FOR QUOTATIONS
     doc.setFont('', 'bold');
-    doc.text('Processed No:', pageWidth - 80, 59);
+    doc.text('Quotation Number:', 14, textStartY + 10);
     doc.setFont('', 'normal');
-    doc.text(requisition.processedNumber, pageWidth - 45, 59);
+    doc.text(requisition.requisitionNumber, 55, textStartY + 10);
+
+    doc.setFont('', 'bold');
+    doc.text('Customer Name:', 14, textStartY + 17);
+    doc.setFont('', 'normal');
+    doc.text(requisition.writtenTo || 'N/A', 55, textStartY + 17);
+
+    if (requisition.customerNumber) {
+      doc.setFont('', 'bold');
+      doc.text('Customer Number:', 14, textStartY + 24);
+      doc.setFont('', 'normal');
+      doc.text(requisition.customerNumber, 55, textStartY + 24);
+    }
+
+    doc.setFont('', 'bold');
+    doc.text('Prepared By:', 14, textStartY + 31);
+    doc.setFont('', 'normal');
+    doc.text(requisition.creatorName, 55, textStartY + 31);
+
+    doc.setFont('', 'bold');
+    doc.text('Date:', pageWidth - 80, textStartY + 10);
+    doc.setFont('', 'normal');
+    const createdDate = requisition.createdAt ? (typeof requisition.createdAt === 'string' ? parseISO(requisition.createdAt) : (requisition.createdAt as any).toDate?.() || new Date(requisition.createdAt as any)) : new Date();
+    doc.text(format(createdDate, 'PPP'), pageWidth - 60, textStartY + 10);
+  } else {
+    // STANDARD INTERNAL REQUISITION INFO
+    doc.setFont('', 'bold');
+    doc.text('Requisition Number:', 14, textStartY + 10);
+    doc.setFont('', 'normal');
+    doc.text(requisition.requisitionNumber, 55, textStartY + 10);
+
+    doc.setFont('', 'bold');
+    doc.text('Sequence Number:', 14, textStartY + 17);
+    doc.setFont('', 'normal');
+    doc.text(requisition.sequenceNumber || 'N/A', 55, textStartY + 17);
+
+    doc.setFont('', 'bold');
+    doc.text('Department:', 14, textStartY + 24);
+    doc.setFont('', 'normal');
+    doc.text(requisition.department, 55, textStartY + 24);
+
+    doc.setFont('', 'bold');
+    doc.text('Requested By:', 14, textStartY + 31);
+    doc.setFont('', 'normal');
+    doc.text(requisition.creatorName, 55, textStartY + 31);
+
+    doc.setFont('', 'bold');
+    doc.text('Written To:', 14, textStartY + 38);
+    doc.setFont('', 'normal');
+    doc.text(requisition.writtenTo || 'N/A', 55, textStartY + 38);
+
+    doc.setFont('', 'bold');
+    doc.text('Date Created:', pageWidth - 80, textStartY + 10);
+    doc.setFont('', 'normal');
+    const createdDate = requisition.createdAt ? (typeof requisition.createdAt === 'string' ? parseISO(requisition.createdAt) : (requisition.createdAt as any).toDate?.() || new Date(requisition.createdAt as any)) : new Date();
+    doc.text(format(createdDate, 'PPP p'), pageWidth - 45, textStartY + 10);
+
+    doc.setFont('', 'bold');
+    doc.text('Status:', pageWidth - 80, textStartY + 17);
+    doc.setFont('', 'normal');
+    doc.text(requisition.status.toUpperCase(), pageWidth - 45, textStartY + 17);
+
+    if (requisition.processedNumber) {
+      doc.setFont('', 'bold');
+      doc.text('Processed No:', pageWidth - 80, textStartY + 24);
+      doc.setFont('', 'normal');
+      doc.text(requisition.processedNumber, pageWidth - 45, textStartY + 24);
+    }
   }
+
+  // Adjusted Y positions for rest of elements
+  const detailsEndY = textStartY + 45;
 
   // Rejection Reason if it exists
   if (requisition.status === 'rejected' && requisition.rejectionReason) {
     doc.setFont('', 'bold');
     doc.setTextColor(200, 0, 0);
-    doc.text('REJECTION REASON:', 14, 80);
+    doc.text('REJECTION REASON:', 14, detailsEndY + 7);
     doc.setFont('', 'normal');
     doc.setFontSize(9);
     const splitReason = doc.splitTextToSize(requisition.rejectionReason, pageWidth - 65);
-    doc.text(splitReason, 55, 80);
+    doc.text(splitReason, 55, detailsEndY + 7);
     doc.setFontSize(10);
     doc.setTextColor(26, 26, 26);
   }
 
   // Notes if they exist
   if (requisition.notes) {
-    const notesY = (requisition.status === 'rejected' && requisition.rejectionReason) ? 87 : 80;
+    const notesY = (requisition.status === 'rejected' && requisition.rejectionReason) ? detailsEndY + 14 : detailsEndY + 7;
     doc.setFont('', 'bold');
     doc.text('Notes:', 14, notesY);
     doc.setFont('', 'normal');
@@ -126,6 +167,7 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
     doc.text(splitNotes, 55, notesY);
     doc.setFontSize(10);
   }
+
 
   const isQR = requisition.type === 'Shop QR' || requisition.type === 'Warehouse QR';
   const isFuel = requisition.type === 'Fuel';

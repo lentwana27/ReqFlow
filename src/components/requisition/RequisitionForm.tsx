@@ -9,13 +9,15 @@ interface RequisitionFormProps {
   userDept: Department;
   userEmail: string;
   initialData?: Requisition;
+  fixedType?: RequisitionType;
 }
 
-export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail, initialData }: RequisitionFormProps) {
-  const [type, setType] = useState<RequisitionType>(initialData?.type || RequisitionType.ADMIN);
+export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail, initialData, fixedType }: RequisitionFormProps) {
+  const [type, setType] = useState<RequisitionType>(fixedType || initialData?.type || RequisitionType.ADMIN);
   const [currency, setCurrency] = useState<Currency>(initialData?.currency || Currency.USD);
   const [notes, setNotes] = useState(initialData?.notes || '');
   const [writtenTo, setWrittenTo] = useState(initialData?.writtenTo || '');
+  const [customerNumber, setCustomerNumber] = useState(initialData?.customerNumber || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
   const [items, setItems] = useState<RequisitionItem[]>(
@@ -23,6 +25,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
   );
 
   const isWrittenToRequired = type !== RequisitionType.SHOP_USE && type !== RequisitionType.WAREHOUSE;
+  const isQuotation = type === RequisitionType.QUOTATIONS;
 
   React.useEffect(() => {
     if (!isWrittenToRequired) {
@@ -147,6 +150,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
       const submissionData: any = {
         type,
         writtenTo,
+        customerNumber: isQuotation ? customerNumber : undefined,
         currency,
         quotationBook: initialData?.quotationBook || '',
         items,
@@ -215,9 +219,17 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
             <div className="max-w-3xl mx-auto bg-white shadow-sm border border-gray-100 p-8 space-y-10">
               <div className="flex justify-between items-start border-b border-gray-100 pb-8">
                 {isWrittenToRequired ? (
-                  <div className="space-y-1">
-                    <p className="text-[10px] uppercase font-black tracking-widest text-gray-400">Destination</p>
-                    <p className="text-xl font-bold text-black uppercase">{writtenTo}</p>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[10px] uppercase font-black tracking-widest text-gray-400">{isQuotation ? 'Customer Name' : 'Destination'}</p>
+                      <p className="text-xl font-bold text-black uppercase">{writtenTo}</p>
+                    </div>
+                    {isQuotation && customerNumber && (
+                      <div>
+                        <p className="text-[10px] uppercase font-black tracking-widest text-gray-400">Customer Number</p>
+                        <p className="text-sm font-bold text-black uppercase">{customerNumber}</p>
+                      </div>
+                    )}
                   </div>
                 ) : <div />}
                 <div className="text-right space-y-1">
@@ -318,17 +330,30 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
           </div>
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); handlePreview(); }} className="flex-1 overflow-hidden flex flex-col md:flex-row">
-            <div className="flex-1 overflow-y-auto p-8 space-y-8 border-r border-gray-100">
+            <div className={`flex-1 overflow-y-auto p-8 space-y-8 ${!fixedType ? 'border-r border-gray-100' : ''}`}>
               {isWrittenToRequired && (
-                <div className="space-y-4">
-                  <label className="input-label">WRITE TO: (Destination of funds) <span className="text-red-500">*</span></label>
-                  <input 
-                    placeholder="Name of recipient or department receiving funds"
-                    className="w-full px-4 py-3 rounded-sm border border-gray-200 focus:border-black focus:ring-0 text-sm transition-all bg-gray-50/30 font-bold uppercase"
-                    value={writtenTo}
-                    onChange={(e) => setWrittenTo(e.target.value.toUpperCase())}
-                    required
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-4">
+                    <label className="input-label">{isQuotation ? 'CUSTOMER NAME' : 'WRITE TO: (Destination of funds)'} <span className="text-red-500">*</span></label>
+                    <input 
+                      placeholder={isQuotation ? "Customer name" : "Name of recipient or department receiving funds"}
+                      className="w-full px-4 py-3 rounded-sm border border-gray-200 focus:border-black focus:ring-0 text-sm transition-all bg-gray-50/30 font-bold uppercase"
+                      value={writtenTo}
+                      onChange={(e) => setWrittenTo(e.target.value.toUpperCase())}
+                      required
+                    />
+                  </div>
+                  {isQuotation && (
+                    <div className="space-y-4">
+                      <label className="input-label font-bold">CUSTOMER NUMBER</label>
+                      <input 
+                        placeholder="e.g. CUST-001"
+                        className="w-full px-4 py-3 rounded-sm border border-gray-200 focus:border-black focus:ring-0 text-sm transition-all bg-gray-50/30 font-bold uppercase"
+                        value={customerNumber}
+                        onChange={(e) => setCustomerNumber(e.target.value.toUpperCase())}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -517,99 +542,125 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
               </div>
             </div>
 
-            <div className="w-full md:w-80 bg-gray-50/50 p-6 space-y-6 overflow-y-auto border-l border-gray-100">
-              <div className="space-y-4">
-                <label className="input-label">Currency</label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {Object.values(Currency).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setCurrency(c)}
-                      className={`text-center px-2 py-2 rounded-sm border transition-all text-[11px] font-bold ${
-                        currency === c 
-                          ? 'border-black bg-black text-white' 
-                          : 'border-gray-200 hover:border-black bg-white text-gray-600'
-                      }`}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <label className="input-label">Requisition Type</label>
-                <div className="space-y-1.5">
-                  {Object.values(RequisitionType).map((t) => {
-                    let isAllowed = true;
-                    let restrictionMsg = '';
-
-                    if (t === RequisitionType.PURCHASING || t === RequisitionType.PROJECTS) {
-                      isAllowed = userDept === Department.PURCHASING;
-                      restrictionMsg = 'Purchasing Dept Only';
-                    } else if (t === RequisitionType.IT) {
-                      isAllowed = userDept === Department.IT;
-                      restrictionMsg = 'IT Dept Only';
-                    } else if (t === RequisitionType.FINANCE) {
-                      isAllowed = userDept === Department.FINANCE;
-                      restrictionMsg = 'Finance Dept Only';
-                    }
-                    
-                    return (
+            {!fixedType && (
+              <div className="w-full md:w-80 bg-gray-50/50 p-6 space-y-6 overflow-y-auto border-l border-gray-100">
+                <div className="space-y-4">
+                  <label className="input-label">Currency</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {Object.values(Currency).map((c) => (
                       <button
-                        key={t}
+                        key={c}
                         type="button"
-                        disabled={!isAllowed}
-                        onClick={() => setType(t)}
-                        className={`w-full text-left px-3 py-2.5 rounded-sm border transition-all flex items-center justify-between ${
-                          type === t 
+                        onClick={() => setCurrency(c)}
+                        className={`text-center px-2 py-2 rounded-sm border transition-all text-[11px] font-bold ${
+                          currency === c 
                             ? 'border-black bg-black text-white' 
-                            : !isAllowed 
-                              ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed opacity-50'
-                              : 'border-gray-200 hover:border-black bg-white text-gray-600 font-medium'
+                            : 'border-gray-200 hover:border-black bg-white text-gray-600'
                         }`}
                       >
-                        <div className="flex flex-col">
-                          <span className="text-[11px] font-bold uppercase tracking-tight">
-                            {t}
-                          </span>
-                          {!isAllowed && <span className="text-[9px] font-black text-red-400 mt-0.5">{restrictionMsg}</span>}
-                        </div>
-                        {type === t && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                        {c}
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="pt-6 border-t border-gray-200">
-                <label className="input-label mb-4">Approval Workflow</label>
-                <div className="space-y-3">
-                  {(() => {
-                    let workflow = [...REQUISITION_WORKFLOWS[type]];
-                    
-                    workflow = workflow.map(role => {
-                      if (role === UserRole.HOD) {
-                        if (userDept === Department.IT) return UserRole.IT_HOD;
-                        if (userDept === Department.WAREHOUSE) return UserRole.WAREHOUSE_HOD;
-                        return `HOD (${userDept})`;
+                <div className="space-y-4">
+                  <label className="input-label">Requisition Type</label>
+                  <div className="space-y-1.5">
+                    {Object.values(RequisitionType).map((t) => {
+                      let isAllowed = true;
+                      let restrictionMsg = '';
+
+                      if (t === RequisitionType.PURCHASING || t === RequisitionType.PROJECTS) {
+                        isAllowed = userDept === Department.PURCHASING;
+                        restrictionMsg = 'Purchasing Dept Only';
+                      } else if (t === RequisitionType.IT) {
+                        isAllowed = userDept === Department.IT;
+                        restrictionMsg = 'IT Dept Only';
+                      } else if (t === RequisitionType.FINANCE) {
+                        isAllowed = userDept === Department.FINANCE;
+                        restrictionMsg = 'Finance Dept Only';
                       }
-                      return role;
-                    });
+                      
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          disabled={!isAllowed}
+                          onClick={() => setType(t)}
+                          className={`w-full text-left px-3 py-2.5 rounded-sm border transition-all flex items-center justify-between ${
+                            type === t 
+                              ? 'border-black bg-black text-white' 
+                              : !isAllowed 
+                                ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed opacity-50'
+                                : 'border-gray-200 hover:border-black bg-white text-gray-600 font-medium'
+                          }`}
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-bold uppercase tracking-tight">
+                              {t}
+                            </span>
+                            {!isAllowed && <span className="text-[9px] font-black text-red-400 mt-0.5">{restrictionMsg}</span>}
+                          </div>
+                          {type === t && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-                    return workflow.map((stage, idx) => (
-                      <div key={idx} className="flex items-start gap-3">
-                        <div className="w-5 h-5 rounded-full bg-white border border-gray-200 flex items-center justify-center text-[9px] font-mono shrink-0 mt-0.5">
-                          {idx + 1}
+                <div className="pt-6 border-t border-gray-200">
+                  <label className="input-label mb-4">Approval Workflow</label>
+                  <div className="space-y-3">
+                    {(() => {
+                      let workflow = [...REQUISITION_WORKFLOWS[type]];
+                      
+                      workflow = workflow.map(role => {
+                        if (role === UserRole.HOD) {
+                          if (userDept === Department.IT) return UserRole.IT_HOD;
+                          if (userDept === Department.WAREHOUSE) return UserRole.WAREHOUSE_HOD;
+                          return `HOD (${userDept})`;
+                        }
+                        return role;
+                      });
+
+                      return workflow.map((stage, idx) => (
+                        <div key={idx} className="flex items-start gap-3">
+                          <div className="w-5 h-5 rounded-full bg-white border border-gray-200 flex items-center justify-center text-[9px] font-mono shrink-0 mt-0.5">
+                            {idx + 1}
+                          </div>
+                          <p className="text-[12px] text-gray-700 font-bold leading-tight">{stage}</p>
                         </div>
-                        <p className="text-[12px] text-gray-700 font-bold leading-tight">{stage}</p>
-                      </div>
-                    ));
-                  })()}
+                      ));
+                    })()}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+            {fixedType && (
+               <div className="w-full md:w-80 bg-gray-50/50 p-6 space-y-6 overflow-y-auto border-l border-gray-100">
+                  <div className="space-y-4">
+                    <label className="input-label tracking-tighter">SUMMARY INFO</label>
+                    <div className="bg-white border border-gray-100 p-4 rounded-sm space-y-3">
+                      <div>
+                        <p className="text-[10px] uppercase font-black text-gray-400">Currency</p>
+                        <select 
+                          value={currency} 
+                          onChange={(e) => setCurrency(e.target.value as Currency)}
+                          className="w-full border-none p-0 text-sm font-bold focus:ring-0"
+                        >
+                          {Object.values(Currency).map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-black text-gray-400">Approval Workflow</p>
+                        <p className="text-xs font-bold">{REQUISITION_WORKFLOWS[type].length} Stages Required</p>
+                      </div>
+                    </div>
+                  </div>
+               </div>
+            )}
+
           </form>
         )}
 

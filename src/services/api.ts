@@ -1110,3 +1110,27 @@ export const customAuthService = {
     }
   }
 };
+
+export const brandingService = {
+  uploadLogo: async (base64Data: string) => {
+    try {
+      const response = await fetch('/api/upload-logo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logoData: base64Data })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to upload logo');
+      }
+      
+      return response.json();
+    } catch (err: any) {
+      if (err.message === 'Failed to fetch') {
+        throw new Error('Connection to server failed. Please check if the backend is running.');
+      }
+      throw err;
+    }
+  }
+};

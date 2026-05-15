@@ -101,6 +101,7 @@ export interface Requisition {
   department: Department;
   items: RequisitionItem[];
   writtenTo: string;
+  customerNumber?: string;
   quotationBook: string;
   currency?: Currency;
   totalAmount: number;
