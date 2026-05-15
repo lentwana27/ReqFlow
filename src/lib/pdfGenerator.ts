@@ -84,6 +84,7 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   }
 
   const isQR = requisition.type === 'Shop QR' || requisition.type === 'Warehouse QR';
+  const isFuel = requisition.type === 'Fuel';
   const currency = requisition.currency || 'USD';
   const symbol = currency === 'USD' ? '$' : '';
   const suffix = currency !== 'USD' ? ` ${currency}` : '';
@@ -104,20 +105,30 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   // Items Table
   autoTable(doc, {
     startY: tableStartY,
-    head: [isQR ? ['Code', 'Description', 'Quantity'] : ['Description', 'Quantity', 'Unit Cost', 'Total Cost']],
-    body: requisition.items.map(item => isQR ? [
-      item.code || 'N/A',
-      item.description,
-      item.qty
-    ] : [
-      item.description,
-      item.qty,
-      `${symbol}${item.unitCost.toFixed(2)}${suffix}`,
-      `${symbol}${item.totalCost.toFixed(2)}${suffix}`
-    ]),
+    head: [
+      isQR 
+        ? ['Code', 'Description', 'Quantity'] 
+        : isFuel 
+          ? ['Description', 'Litres', 'Type'] 
+          : ['Description', 'Quantity', 'Unit Cost', 'Total Cost']
+    ],
+    body: requisition.items.map(item => {
+      if (isQR) {
+        return [item.code || 'N/A', item.description, item.qty];
+      } else if (isFuel) {
+        return [item.description, `${item.qty} L`, item.fuelType || 'Diesel'];
+      } else {
+        return [
+          item.description,
+          item.qty,
+          `${symbol}${item.unitCost.toFixed(2)}${suffix}`,
+          `${symbol}${item.totalCost.toFixed(2)}${suffix}`
+        ];
+      }
+    }),
     theme: 'striped',
     headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255], fontStyle: 'bold' },
-    foot: isQR ? undefined : [['', '', 'TOTAL AMOUNT', `${symbol}${requisition.totalAmount.toFixed(2)}${suffix}`]],
+    foot: (isQR || isFuel) ? undefined : [['', '', 'TOTAL AMOUNT', `${symbol}${requisition.totalAmount.toFixed(2)}${suffix}`]],
     footStyles: { fillColor: [245, 245, 245], textColor: [26, 26, 26], fontStyle: 'bold' },
     styles: { fontSize: 9, cellPadding: 4 },
   });

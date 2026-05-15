@@ -398,14 +398,16 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
             <div className="border border-gray-100 rounded-sm overflow-hidden text-sm">
               {(() => {
                 const isQR = requisition.type === RequisitionType.SHOP_QR || requisition.type === RequisitionType.WAREHOUSE_QR;
+                const isFuel = requisition.type === RequisitionType.FUEL;
                 return (
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-100">
                       <tr className="font-mono text-[10px] uppercase text-gray-500">
                         {isQR && <th className="text-left px-4 py-3">Code</th>}
                         <th className="text-left px-4 py-3">Description</th>
-                        <th className="text-center px-4 py-3">Qty</th>
-                        {!isQR && (
+                        <th className="text-center px-4 py-3">{isFuel ? 'Litres' : 'Qty'}</th>
+                        {isFuel && <th className="text-right px-4 py-3">Type</th>}
+                        {!isQR && !isFuel && (
                           <>
                             <th className="text-right px-4 py-3">Rate</th>
                             <th className="text-right px-4 py-3">Total</th>
@@ -418,8 +420,9 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                         <tr key={idx}>
                           {isQR && <td className="px-4 py-3 font-mono text-blue-600 font-bold">{item.code || 'N/A'}</td>}
                           <td className="px-4 py-3">{item.description}</td>
-                          <td className="px-4 py-3 text-center">{item.qty}</td>
-                          {!isQR && (
+                          <td className="px-4 py-3 text-center">{item.qty}{isFuel ? ' L' : ''}</td>
+                          {isFuel && <td className="px-4 py-3 text-right font-bold">{item.fuelType || 'Diesel'}</td>}
+                          {!isQR && !isFuel && (
                             <>
                               <td className="px-4 py-3 text-right">{symbol}{item.unitCost.toFixed(2)}{suffix}</td>
                               <td className="px-4 py-3 text-right font-bold">{symbol}{item.totalCost.toFixed(2)}{suffix}</td>
@@ -428,7 +431,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                         </tr>
                       ))}
                     </tbody>
-                    {!isQR && (
+                    {!isQR && !isFuel && (
                       <tfoot className="bg-gray-50/50">
                         <tr className="font-bold">
                           <td colSpan={3} className="px-4 py-4 text-right uppercase tracking-wider text-[10px]">Total Amount ({currency})</td>

@@ -51,6 +51,7 @@ export interface RequisitionItem {
   unitCost: number;
   totalCost: number;
   code?: string;
+  fuelType?: 'Diesel' | 'Petrol';
 }
 
 export interface Approval {

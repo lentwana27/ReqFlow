@@ -223,27 +223,47 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                   <thead className="bg-gray-50 border-y border-gray-100">
                     <tr className="text-[10px] uppercase font-bold text-gray-500">
                       <th className="text-left px-4 py-3">Description</th>
-                      <th className="text-center px-4 py-3">Qty</th>
-                      <th className="text-right px-4 py-3">Unit Cost</th>
-                      <th className="text-right px-4 py-3">Total</th>
+                      {type === RequisitionType.FUEL ? (
+                        <>
+                          <th className="text-center px-4 py-3">Litres</th>
+                          <th className="text-right px-4 py-3">Type</th>
+                        </>
+                      ) : (
+                        <>
+                          <th className="text-center px-4 py-3">Qty</th>
+                          <th className="text-right px-4 py-3">Unit Cost</th>
+                          <th className="text-right px-4 py-3">Total</th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {items.map((item, i) => (
                       <tr key={i}>
                         <td className="px-4 py-3 font-medium">{item.description}</td>
-                        <td className="px-4 py-3 text-center">{item.qty}Units</td>
-                        <td className="px-4 py-3 text-right">{currency === Currency.USD ? '$' : ''}{item.unitCost.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right font-bold">{currency === Currency.USD ? '$' : ''}{item.totalCost.toFixed(2)}</td>
+                        {type === RequisitionType.FUEL ? (
+                          <>
+                            <td className="px-4 py-3 text-center">{item.qty} L</td>
+                            <td className="px-4 py-3 text-right font-bold">{item.fuelType || 'Diesel'}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-4 py-3 text-center">{item.qty}Units</td>
+                            <td className="px-4 py-3 text-right">{currency === Currency.USD ? '$' : ''}{item.unitCost.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-right font-bold">{currency === Currency.USD ? '$' : ''}{item.totalCost.toFixed(2)}</td>
+                          </>
+                        )}
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="border-t-2 border-black">
-                    <tr className="font-black text-lg">
-                      <td colSpan={3} className="px-4 py-6 text-right uppercase tracking-tighter">Grand Total ({currency})</td>
-                      <td className="px-4 py-6 text-right">{currency === Currency.USD ? '$' : ''}{totalAmount.toFixed(2)} {currency !== Currency.USD ? currency : ''}</td>
-                    </tr>
-                  </tfoot>
+                  {type !== RequisitionType.FUEL && (
+                    <tfoot className="border-t-2 border-black">
+                      <tr className="font-black text-lg">
+                        <td colSpan={3} className="px-4 py-6 text-right uppercase tracking-tighter">Grand Total ({currency})</td>
+                        <td className="px-4 py-6 text-right">{currency === Currency.USD ? '$' : ''}{totalAmount.toFixed(2)} {currency !== Currency.USD ? currency : ''}</td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
 
@@ -321,6 +341,12 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                         <div className="col-span-7">Description</div>
                         <div className="col-span-2">Qty</div>
                       </>
+                    ) : type === RequisitionType.FUEL ? (
+                      <>
+                        <div className="col-span-6">Description</div>
+                        <div className="col-span-3">Litres</div>
+                        <div className="col-span-3">Type</div>
+                      </>
                     ) : (
                       <>
                         <div className="col-span-6">Description</div>
@@ -333,6 +359,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
 
                   {items.map((item, idx) => {
                     const isQR = type === RequisitionType.SHOP_QR || type === RequisitionType.WAREHOUSE_QR;
+                    const isFuel = type === RequisitionType.FUEL;
                     return (
                       <div key={idx} className="grid grid-cols-12 gap-4 items-center px-4 py-3 bg-white border border-gray-100 hover:border-black transition-colors rounded-sm group relative">
                         {isQR && (
@@ -345,23 +372,38 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                             />
                           </div>
                         )}
-                        <div className={isQR ? "col-span-7" : "col-span-6"}>
+                        <div className={isQR ? "col-span-7" : isFuel ? "col-span-6" : "col-span-6"}>
                           <input 
-                            placeholder="e.g. Printer Paper A4"
+                            placeholder={isFuel ? "e.g. For Generator" : "e.g. Printer Paper A4"}
                             className="w-full bg-transparent text-sm focus:outline-none"
                             value={item.description}
                             onChange={(e) => updateItem(idx, 'description', e.target.value)}
                           />
                         </div>
-                        <div className="col-span-2">
-                          <input 
-                            type="number"
-                            className="w-full bg-transparent text-sm focus:outline-none"
-                            value={item.qty}
-                            onChange={(e) => updateItem(idx, 'qty', parseInt(e.target.value) || 0)}
-                          />
+                        <div className={isFuel ? "col-span-3" : "col-span-2"}>
+                          <div className="flex items-center gap-1">
+                            <input 
+                              type="number"
+                              className="w-full bg-transparent text-sm focus:outline-none"
+                              value={item.qty}
+                              onChange={(e) => updateItem(idx, 'qty', parseInt(e.target.value) || 0)}
+                            />
+                            {isFuel && <span className="text-[10px] text-gray-400 font-bold">L</span>}
+                          </div>
                         </div>
-                        {!isQR && (
+                        {isFuel && (
+                          <div className="col-span-3">
+                            <select 
+                              className="w-full bg-transparent text-sm focus:outline-none font-bold"
+                              value={item.fuelType || 'Diesel'}
+                              onChange={(e) => updateItem(idx, 'fuelType', e.target.value)}
+                            >
+                              <option value="Diesel">Diesel</option>
+                              <option value="Petrol">Petrol</option>
+                            </select>
+                          </div>
+                        )}
+                        {!isQR && !isFuel && (
                           <>
                             <div className="col-span-2">
                               <input 
