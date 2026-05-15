@@ -9,12 +9,11 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
 
-  // Header
+  const headerY = 20;
+  let textStartY = 35;
+
   // Logo Support: The user can upload logo.png to /public/
   try {
-    // This is a simple way to check if an image exists and add it to PDF
-    // We'll use a simple approach: if it exists, draw it. 
-    // However, since generateRequisitionPDF is async, we can await an image load.
     const loadImg = (url: string): Promise<HTMLImageElement | null> => {
       return new Promise((resolve) => {
         const img = new Image();
@@ -26,22 +25,31 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
 
     const logo = await loadImg('/logo.png');
     if (logo) {
-      // Draw logo in top left
-      doc.addImage(logo, 'PNG', 14, 10, 30, 30);
+      const aspect = logo.width / logo.height;
+      const width = 80;
+      const height = width / aspect;
+      doc.addImage(logo, 'PNG', (pageWidth - width) / 2, 8, width, height);
+      textStartY = height + 15;
     }
   } catch (e) {
     console.log('No logo found at /logo.png');
   }
 
+  // Only show the text brand if no logo or if user specifically wants it.
+  // Given the logo has the name, let's just show 'INTERNAL REQUISITION' if logo exists,
+  // or show both if no logo.
   doc.setFontSize(24);
-  doc.setTextColor(0, 51, 102); // Deep blue for branding
+  doc.setTextColor(0, 51, 102);
   doc.setFont('', 'bold');
-  doc.text('MINEAZY MINING SOLUTIONS', pageWidth / 2, 20, { align: 'center' });
+  
+  // If logo exists, maybe we don't need the big text header? 
+  // Let's keep it but move it down if logo is present.
+  doc.text('MINEAZY MINING SOLUTIONS', pageWidth / 2, textStartY, { align: 'center' });
 
   doc.setFontSize(14);
   doc.setTextColor(100, 100, 100);
   doc.setFont('', 'normal');
-  doc.text('INTERNAL REQUISITION', pageWidth / 2, 28, { align: 'center' });
+  doc.text('INTERNAL REQUISITION', pageWidth / 2, textStartY + 8, { align: 'center' });
 
   // Divider
   doc.setDrawColor(230, 230, 230);
