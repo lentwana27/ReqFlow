@@ -2,12 +2,13 @@
 -- Run this in the Supabase SQL Editor
 
 -- 0. Cleanup (WARNING: This deletes all existing and associated data)
-DROP TABLE IF EXISTS public.activity_logs;
-DROP TABLE IF EXISTS public.requisitions;
-DROP TABLE IF EXISTS public.profiles;
+DROP TABLE IF EXISTS public.activity_logs CASCADE;
+DROP TABLE IF EXISTS public.requisitions CASCADE;
+DROP TABLE IF EXISTS public.recovery_tokens CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
 
 -- 1. Profiles Table (Linked to auth.users)
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   "uid" UUID REFERENCES auth.users NOT NULL PRIMARY KEY,
   "username" TEXT UNIQUE NOT NULL,
   "email" TEXT UNIQUE,
@@ -21,7 +22,7 @@ CREATE TABLE public.profiles (
 );
 
 -- 2. Requisitions Table
-CREATE TABLE public.requisitions (
+CREATE TABLE IF NOT EXISTS public.requisitions (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "requisitionNumber" TEXT NOT NULL,
   "sequenceNumber" TEXT, -- Added
@@ -48,7 +49,7 @@ CREATE TABLE public.requisitions (
 );
 
 -- 3. Activity Logs Table
-CREATE TABLE public.activity_logs (
+CREATE TABLE IF NOT EXISTS public.activity_logs (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "timestamp" TIMESTAMPTZ DEFAULT NOW(),
   "user" TEXT NOT NULL,
@@ -63,7 +64,7 @@ CREATE TABLE public.activity_logs (
 );
 
 -- 4. Password Recovery Tokens (For manual recovery link flow)
-CREATE TABLE public.recovery_tokens (
+CREATE TABLE IF NOT EXISTS public.recovery_tokens (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "email" TEXT NOT NULL,
   "token" TEXT UNIQUE NOT NULL,
@@ -102,7 +103,7 @@ CREATE POLICY "Users and admins can view relevant requisitions." ON public.requi
   FOR SELECT USING (
     auth.uid() = "creatorId" OR 
     (SELECT "role" FROM public.profiles WHERE "uid" = auth.uid()) = ANY("involvedRoles") OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin', 'Director', 'Treasurer', 'Finance HOD'))
+    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin', 'ADMIN', 'Director', 'Treasurer', 'Finance HOD', 'TREASURER', 'FINANCE_HOD', 'Accounting HOD'))
   );
 
 CREATE POLICY "Users can create requisitions." ON public.requisitions
@@ -112,11 +113,11 @@ CREATE POLICY "Users and admins can update requisitions." ON public.requisitions
   FOR UPDATE USING (
     (auth.uid() = "creatorId" AND "status" = 'pending') OR
     (SELECT "role" FROM public.profiles WHERE "uid" = auth.uid()) = ANY("involvedRoles") OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin')) OR
+    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin', 'ADMIN')) OR
     (
       -- Specifically allow Treasurer and Finance HOD to update 'approved' requisitions to 'processed'
-      (SELECT "role" FROM public.profiles WHERE "uid" = auth.uid()) IN ('Treasurer', 'Finance HOD') 
-      AND "status" = 'approved'
+      (SELECT "role" FROM public.profiles WHERE "uid" = auth.uid()) IN ('Treasurer', 'Finance HOD', 'TREASURER', 'FINANCE_HOD', 'Accounting HOD', 'ACCOUNTING_HOD') 
+      AND "status" IN ('approved', 'processed')
     )
   );
 
