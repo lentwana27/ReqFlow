@@ -10,7 +10,7 @@ app.use(express.json());
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'REQFLOW PRO', environment: process.env.NODE_ENV || 'development' });
+  res.json({ status: 'ok', service: 'MINEAZY REQFLOW', environment: process.env.NODE_ENV || 'development' });
 });
 
 // Admin Password Reset
@@ -94,7 +94,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       from: fromEmail,
       to: [email],
       subject: 'Reset Your ReqFlow Pro Password',
-      text: `Hello,\n\nYou recently requested to reset your password for ReqFlow Pro.\n\nTo reset your password, please follow the link below (valid for 1 hour):\n${recoveryLink}\n\nIf you did not request this, please ignore this email.\n\nThank you,\nREQFLOW PRO System`.trim()
+      text: `Hello,\n\nYou recently requested to reset your password for Mineazy ReqFlow.\n\nTo reset your password, please follow the link below (valid for 1 hour):\n${recoveryLink}\n\nIf you did not request this, please ignore this email.\n\nThank you,\nMINEAZY REQFLOW System`.trim()
     });
 
     res.json({ success: true, message: 'Reset link sent successfully.' });

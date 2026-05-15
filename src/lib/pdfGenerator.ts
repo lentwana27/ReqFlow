@@ -10,14 +10,38 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   const pageWidth = doc.internal.pageSize.width;
 
   // Header
-  doc.setFontSize(22);
-  doc.setTextColor(26, 26, 26);
-  doc.text('INTERNAL REQUISITION', pageWidth / 2, 20, { align: 'center' });
+  // Logo Support: The user can upload logo.png to /public/
+  try {
+    // This is a simple way to check if an image exists and add it to PDF
+    // We'll use a simple approach: if it exists, draw it. 
+    // However, since generateRequisitionPDF is async, we can await an image load.
+    const loadImg = (url: string): Promise<HTMLImageElement | null> => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+    };
 
-  doc.setFontSize(10);
+    const logo = await loadImg('/logo.png');
+    if (logo) {
+      // Draw logo in top left
+      doc.addImage(logo, 'PNG', 14, 10, 30, 30);
+    }
+  } catch (e) {
+    console.log('No logo found at /logo.png');
+  }
+
+  doc.setFontSize(24);
+  doc.setTextColor(0, 51, 102); // Deep blue for branding
+  doc.setFont('', 'bold');
+  doc.text('MINEAZY MINING SOLUTIONS', pageWidth / 2, 20, { align: 'center' });
+
+  doc.setFontSize(14);
   doc.setTextColor(100, 100, 100);
-  const typeLabel = requisition.type === 'Quotations' ? requisition.type.toUpperCase() : `${requisition.type.toUpperCase()} REQUISITION`;
-  doc.text(typeLabel, pageWidth / 2, 28, { align: 'center' });
+  doc.setFont('', 'normal');
+  doc.text('INTERNAL REQUISITION', pageWidth / 2, 28, { align: 'center' });
 
   // Divider
   doc.setDrawColor(230, 230, 230);

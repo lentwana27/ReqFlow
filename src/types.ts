@@ -45,7 +45,8 @@ export enum Department {
   SECURITY = 'Security',
   DRIVER = 'Driver',
   AUDIT = 'Audit',
-  FINANCE = 'Finance'
+  FINANCE = 'Finance',
+  ADMINISTRATION = 'Administration'
 }
 
 export interface RequisitionItem {

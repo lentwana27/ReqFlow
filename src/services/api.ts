@@ -1,5 +1,5 @@
 /**
- * API Service for REQFLOW PRO
+ * API Service for MINEAZY REQFLOW
  * Uses Supabase for Backend and Dexie for local caching
  */
 
@@ -749,7 +749,7 @@ You can process this requisition here:
 ${requisitionLink}
 
 Thank you,
-REQFLOW PRO System
+MINEAZY REQFLOW System
             `.trim()
           })
         }).catch(console.error);
@@ -800,7 +800,7 @@ ${requisitionLink}
 If you need to make corrections, please create a new requisition or contact the approver.
 
 Thank you,
-REQFLOW PRO System
+MINEAZY REQFLOW System
               `.trim()
             })
           }).catch(console.error);
@@ -834,7 +834,7 @@ You can view the details and verification token here:
 ${requisitionLink}
 
 Thank you,
-REQFLOW PRO System
+MINEAZY REQFLOW System
               `.trim()
             })
           }).catch(console.error);
@@ -866,7 +866,7 @@ REQUESTER: ${requisition.creatorName}
 Please review and confirm receipt in the system.
 
 Thank you,
-REQFLOW PRO System
+MINEAZY REQFLOW System
                 `.trim()
               })
             }).catch(console.error);
@@ -893,7 +893,7 @@ The Treasurer has confirmed receipt of the unused funds for Requisition ${requis
 AMOUNT RETURNED: ${requisition.currency || '$'}${requisition.amountToReturn?.toFixed(2)}
 
 Thank you,
-REQFLOW PRO System
+MINEAZY REQFLOW System
               `.trim()
             })
           }).catch(console.error);
@@ -984,7 +984,7 @@ You can view and approve the requisition by clicking the link below:
 ${requisitionLink}
 
 Thank you,
-REQFLOW PRO System
+MINEAZY REQFLOW System
               `.trim()
             })
           });

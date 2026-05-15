@@ -287,7 +287,7 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
             <div className="bg-black p-2.5 rounded-lg">
               <Shield className="text-white w-6 h-6" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tighter">REQFLOW PRO</h1>
+            <h1 className="text-2xl font-bold tracking-tighter">MINEAZY REQFLOW</h1>
           </div>
 
           {/* ── Heading ── */}

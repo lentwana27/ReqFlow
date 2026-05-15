@@ -22,7 +22,7 @@ export default function Navbar({ userProfile, currentView, onViewChange, onLogou
           <div className="bg-black p-1.5 rounded-sm">
             <FileText className="text-white w-5 h-5" />
           </div>
-          <h1 className="font-mono font-bold tracking-tighter text-xl text-black">REQFLOW PRO</h1>
+          <h1 className="font-mono font-bold tracking-tighter text-xl text-black">MINEAZY REQFLOW</h1>
         </div>
 
         {userProfile && (
