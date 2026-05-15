@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS public.requisitions (
   "processedNumber" TEXT, -- Added
   "amountIssued" NUMERIC, -- Added: Actual amount issued by Treasurer
   "changeReturned" NUMERIC, -- Added: Amount to be returned if issued > total
+  "amountToReturn" NUMERIC, -- Added: Amount user wants to return
+  "returnStatus" TEXT DEFAULT 'none', -- Added: none, pending, confirmed
   "type" TEXT NOT NULL,
   "creatorId" UUID REFERENCES public.profiles("uid") ON DELETE CASCADE NOT NULL,
   "creatorName" TEXT NOT NULL,
@@ -120,8 +122,8 @@ CREATE POLICY "Users and admins can update requisitions." ON public.requisitions
     (SELECT "role" FROM public.profiles WHERE "uid" = auth.uid()) = ANY("involvedRoles") OR
     EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin', 'ADMIN')) OR
     (
-      -- Specifically allow Treasurer and Finance HOD to update 'approved' requisitions to 'processed'
-      (SELECT "role" FROM public.profiles WHERE "uid" = auth.uid()) IN ('Treasurer', 'Finance HOD', 'TREASURER', 'FINANCE_HOD', 'Accounting HOD', 'ACCOUNTING_HOD') 
+      -- Specifically allow Treasurer to update 'approved' requisitions to 'processed'
+      (SELECT "role" FROM public.profiles WHERE "uid" = auth.uid()) IN ('Treasurer', 'TREASURER') 
       AND "status" IN ('approved', 'processed')
     )
   );

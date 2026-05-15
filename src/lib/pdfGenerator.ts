@@ -217,6 +217,27 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
     doc.setFont('', 'normal');
     doc.text(requisition.issuedInfo.signatureId, 45, nextY + 19);
 
+    if (requisition.amountIssued !== undefined && requisition.amountIssued !== null) {
+      doc.setFont('', 'bold');
+      doc.text('Amount Issued:', 14, nextY + 25);
+      doc.setFont('', 'normal');
+      doc.text(`${symbol}${requisition.amountIssued.toFixed(2)}${suffix}`, 45, nextY + 25);
+    }
+
+    if (requisition.returnStatus === 'confirmed') {
+      doc.setFont('', 'bold');
+      doc.setTextColor(0, 100, 0);
+      doc.text('Amount Returned:', 14, nextY + 31);
+      doc.setFont('', 'normal');
+      doc.text(`${symbol}${requisition.amountToReturn?.toFixed(2)}${suffix}`, 45, nextY + 31);
+    } else if (requisition.changeReturned && requisition.changeReturned > 0) {
+      doc.setFont('', 'bold');
+      doc.setTextColor(150, 100, 0);
+      doc.text('Change Due:', 14, nextY + 31);
+      doc.setFont('', 'normal');
+      doc.text(`${symbol}${requisition.changeReturned.toFixed(2)}${suffix}`, 45, nextY + 31);
+    }
+
     // QR Code for Issuance
     const verifyUrl = `${getPublicOrigin()}/?verify=${requisition.issuedInfo.signatureId}&reqId=${requisition.id}`;
     const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 100 });

@@ -113,6 +113,8 @@ export interface Requisition {
   rejectionReason?: string;
   amountIssued?: number;
   changeReturned?: number;
+  amountToReturn?: number;
+  returnStatus?: 'none' | 'pending' | 'confirmed';
   createdAt: any;
   updatedAt: any;
 }

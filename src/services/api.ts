@@ -841,6 +841,65 @@ REQFLOW PRO System
         }
         return;
       }
+      
+      // Handle Return of Funds Notifications (to Treasurer)
+      if (requisition.returnStatus === 'pending') {
+        const { data: treasurers } = await supabase.from('profiles').select('email, name').eq('role', UserRole.TREASURER);
+        if (treasurers && treasurers.length > 0) {
+          for (const t of treasurers) {
+            if (!t.email) continue;
+            console.log(`[Notification] Notifying Treasurer ${t.email} of funds return...`);
+            await fetch('/api/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                to: t.email,
+                subject: `Funds Return: Requisition ${requisition.requisitionNumber}`,
+                body: `
+Hello ${t.name},
+
+The creator of Requisition ${requisition.requisitionNumber} is returning unused funds.
+
+AMOUNT TO RETURN: ${requisition.currency || '$'}${requisition.amountToReturn?.toFixed(2)}
+REQUESTER: ${requisition.creatorName}
+
+Please review and confirm receipt in the system.
+
+Thank you,
+REQFLOW PRO System
+                `.trim()
+              })
+            }).catch(console.error);
+          }
+        }
+        return;
+      }
+
+      // Handle Return Confirmation Notification (to Creator)
+      if (requisition.returnStatus === 'confirmed') {
+        const { data: creatorProfile } = await supabase.from('profiles').select('email, name').eq('uid', requisition.creatorId).maybeSingle();
+        if (creatorProfile?.email) {
+          await fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: creatorProfile.email,
+              subject: `Return Confirmed: Requisition ${requisition.requisitionNumber}`,
+              body: `
+Hello ${creatorProfile.name},
+
+The Treasurer has confirmed receipt of the unused funds for Requisition ${requisition.requisitionNumber}.
+
+AMOUNT RETURNED: ${requisition.currency || '$'}${requisition.amountToReturn?.toFixed(2)}
+
+Thank you,
+REQFLOW PRO System
+              `.trim()
+            })
+          }).catch(console.error);
+        }
+        return;
+      }
 
       const nextRole = approvals[currentStage]?.role;
       if (!nextRole) return;

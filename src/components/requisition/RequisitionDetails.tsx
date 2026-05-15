@@ -24,6 +24,8 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
   const [isProcessing, setIsProcessing] = useState<'approved' | 'rejected' | 'processed' | null>(null);
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [amountIssued, setAmountIssued] = useState<string>('');
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [amountToReturnRaw, setAmountToReturnRaw] = useState<string>('');
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -368,9 +370,25 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
   };
 
   const userRole = userProfile?.role as string;
-  const isFinance = userRole === UserRole.FINANCE_HOD || userRole === 'Finance HOD' || userRole === 'FINANCE_HOD' || userRole === 'Accounting HOD';
   const isTreasurer = userRole === UserRole.TREASURER || userRole === 'Treasurer' || userRole === 'TREASURER';
-  const isSystemAdmin = userProfile?.username === 'admin' || userRole === UserRole.ADMIN || userRole === 'System Administrator' || userRole === 'ADMIN';
+
+  const typesEligibleForReturn = [
+    RequisitionType.ADMIN,
+    RequisitionType.FINANCE,
+    RequisitionType.PURCHASING,
+    RequisitionType.PROJECTS,
+    RequisitionType.IT,
+    RequisitionType.FUEL
+  ];
+
+  const canRequestReturn = requisition.status === 'processed' && 
+                           requisition.creatorId === userProfile.uid && 
+                           (requisition.returnStatus === 'none' || !requisition.returnStatus) &&
+                           typesEligibleForReturn.includes(requisition.type as any);
+
+  const canConfirmReturn = isTreasurer && 
+                           requisition.status === 'processed' && 
+                           requisition.returnStatus === 'pending';
 
   // Treasurer issues specifically for these types as per user request
   const treasurerAllowedTypes = [
@@ -381,11 +399,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     RequisitionType.FINANCE
   ];
   
-  const canProcess = (
-    (isTreasurer && treasurerAllowedTypes.includes(requisition.type as any)) || 
-    isFinance || 
-    isSystemAdmin
-  ) && requisition.status === 'approved';
+  const canProcess = isTreasurer && treasurerAllowedTypes.includes(requisition.type as any) && requisition.status === 'approved';
 
   const currency = requisition.currency || Currency.USD;
   const symbol = currency === Currency.USD ? '$' : '';
@@ -482,6 +496,16 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                 <div className="bg-amber-50 p-2 border border-amber-100 rounded-sm">
                   <label className="text-[9px] uppercase font-bold text-amber-600 block">Change to be Returned</label>
                   <p className="text-sm font-bold text-amber-800">{symbol}{requisition.changeReturned.toFixed(2)}{suffix}</p>
+                </div>
+              )}
+              {requisition.returnStatus && requisition.returnStatus !== 'none' && (
+                <div className={`${requisition.returnStatus === 'confirmed' ? 'bg-green-50 border-green-100' : 'bg-blue-50 border-blue-100'} p-2 border rounded-sm`}>
+                  <label className={`text-[9px] uppercase font-bold ${requisition.returnStatus === 'confirmed' ? 'text-green-600' : 'text-blue-600'} block`}>
+                    Funds Return {requisition.returnStatus === 'confirmed' ? '(CONFIRMED)' : '(PENDING)'}
+                  </label>
+                  <p className={`text-sm font-bold ${requisition.returnStatus === 'confirmed' ? 'text-green-800' : 'text-blue-800'}`}>
+                    {symbol}{requisition.amountToReturn?.toFixed(2)}{suffix}
+                  </p>
                 </div>
               )}
             </div>
@@ -816,35 +840,89 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
               </button>
             </div>
           ) : (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs text-gray-400 font-medium font-bold">
-                {requisition.status === 'pending' ? (
-                  <>
-                    <Clock className="w-4 h-4" /> 
-                    <span>Waiting for {requisition.approvals[requisition.currentStage]?.role}</span>
-                  </>
-                ) : requisition.status === 'processed' ? (
-                  <>
-                    <Check className="w-4 h-4 text-green-600" />
-                    <span className="text-green-600 uppercase font-black tracking-widest">Requisition Issued</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4 text-blue-600" />
-                    <span className="text-blue-600 uppercase">Status: {requisition.status === 'approved' ? 'Completed' : requisition.status}</span>
-                  </>
+            <div className="space-y-6">
+              {canConfirmReturn && (
+                <div className="bg-green-50 border border-green-100 p-6 rounded-sm space-y-4">
+                  <div className="flex items-start gap-3">
+                    <Check className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-xs font-black text-green-900 uppercase">Confirm Return of Funds</h4>
+                      <p className="text-[10px] text-green-600 leading-relaxed mt-0.5">
+                        The requester is returning {symbol}{requisition.amountToReturn?.toFixed(2)}{suffix}. Verify receipt.
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={async () => {
+                      try {
+                        await handleUpdateStatus('processed', false, 'Funds Receipt Confirmed', {
+                          returnStatus: 'confirmed'
+                        });
+                        showToast('Funds return confirmed', 'success');
+                      } catch (err) {
+                        showToast('Failed to confirm return', 'error');
+                      }
+                    }}
+                    disabled={!!isProcessing || isSuccess}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-sm text-sm uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
+                  >
+                    {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+                    Confirm Receipt
+                  </button>
+                </div>
+              )}
+
+              {canRequestReturn && (
+                <div className="bg-amber-50 border border-amber-100 p-6 rounded-sm space-y-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-xs font-black text-amber-900 uppercase">Return Unused Funds</h4>
+                      <p className="text-[10px] text-amber-600 leading-relaxed mt-0.5">
+                        If you have unused funds from this requisition, click below to initiate a return.
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setIsReturnModalOpen(true)}
+                    className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-sm text-sm uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                    Return Funds
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-gray-400 font-medium font-bold">
+                  {requisition.status === 'pending' ? (
+                    <>
+                      <Clock className="w-4 h-4" /> 
+                      <span>Waiting for {requisition.approvals[requisition.currentStage]?.role}</span>
+                    </>
+                  ) : requisition.status === 'processed' ? (
+                    <>
+                      <Check className="w-4 h-4 text-green-600" />
+                      <span className="text-green-600 uppercase font-black tracking-widest">Requisition Issued</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 text-blue-600" />
+                      <span className="text-blue-600 uppercase">Status: {requisition.status === 'approved' ? 'Completed' : requisition.status}</span>
+                    </>
+                  )}
+                </div>
+                {canDelete() && (
+                  <button 
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="text-xs text-red-500 hover:text-red-700 font-bold uppercase tracking-widest transition-colors flex items-center gap-1.5"
+                  >
+                    {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                    Delete Record
+                  </button>
                 )}
               </div>
-              {canDelete() && (
-                <button 
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className="text-xs text-red-500 hover:text-red-700 font-bold uppercase tracking-widest transition-colors flex items-center gap-1.5"
-                >
-                  {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-                  Delete Record
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -985,6 +1063,77 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                     className="flex-1 bg-blue-900 text-white py-4 rounded-sm text-sm font-bold uppercase tracking-widest hover:bg-black transition-colors disabled:opacity-50 shadow-lg"
                   >
                     {isProcessing === 'processed' ? 'Processing...' : 'Confirm Disbursement'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isReturnModalOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-sm shadow-2xl overflow-hidden border border-gray-100"
+            >
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-amber-50">
+                <div className="flex items-center gap-2 text-amber-700">
+                  <ArrowRight className="w-5 h-5" />
+                  <h3 className="font-bold text-sm uppercase tracking-tight">Return Unused Funds</h3>
+                </div>
+                <button onClick={() => setIsReturnModalOpen(false)} className="text-amber-400 hover:text-amber-700">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-gray-400">Amount to Return ({currency})</label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    autoFocus
+                    placeholder="Enter amount to return..."
+                    value={amountToReturnRaw}
+                    onChange={(e) => setAmountToReturnRaw(e.target.value)}
+                    className="w-full text-2xl font-bold p-4 border border-gray-200 rounded-sm focus:outline-none focus:ring-1 focus:ring-amber-500 bg-white"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3 pt-4">
+                  <button 
+                    onClick={() => setIsReturnModalOpen(false)}
+                    className="flex-1 px-4 py-2 text-sm font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      const amount = parseFloat(amountToReturnRaw);
+                      if (isNaN(amount) || amount <= 0) {
+                        showToast('Please enter a valid amount', 'error');
+                        return;
+                      }
+                      
+                      try {
+                        await requisitionService.update(requisition.id, {
+                          amountToReturn: amount,
+                          returnStatus: 'pending',
+                          updatedAt: new Date().toISOString()
+                        });
+                        showToast('Return request submitted for Treasurer approval', 'success');
+                        setIsReturnModalOpen(false);
+                        onClose();
+                      } catch (err) {
+                        showToast('Failed to submit return request', 'error');
+                      }
+                    }}
+                    className="flex-1 bg-amber-600 text-white py-4 rounded-sm text-sm font-bold uppercase tracking-widest hover:bg-black transition-colors shadow-lg"
+                  >
+                    Request Return
                   </button>
                 </div>
               </div>
