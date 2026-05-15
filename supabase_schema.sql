@@ -1,11 +1,6 @@
--- Supabase Schema for REQFLOW PRO - CLEAN START
+-- Supabase Schema for REQFLOW PRO - Production Update Only
 -- Run this in the Supabase SQL Editor
-
--- 0. Cleanup (WARNING: This deletes all existing and associated data)
-DROP TABLE IF EXISTS public.activity_logs CASCADE;
-DROP TABLE IF EXISTS public.requisitions CASCADE;
-DROP TABLE IF EXISTS public.recovery_tokens CASCADE;
-DROP TABLE IF EXISTS public.profiles CASCADE;
+-- This file uses IF NOT EXISTS to prevent accidental data loss.
 
 -- 1. Profiles Table (Linked to auth.users)
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -27,6 +22,8 @@ CREATE TABLE IF NOT EXISTS public.requisitions (
   "requisitionNumber" TEXT NOT NULL,
   "sequenceNumber" TEXT, -- Added
   "processedNumber" TEXT, -- Added
+  "amountIssued" NUMERIC, -- Added: Actual amount issued by Treasurer
+  "changeReturned" NUMERIC, -- Added: Amount to be returned if issued > total
   "type" TEXT NOT NULL,
   "creatorId" UUID REFERENCES public.profiles("uid") ON DELETE CASCADE NOT NULL,
   "creatorName" TEXT NOT NULL,
@@ -78,27 +75,33 @@ ALTER TABLE public.requisitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 
 -- Profiles Policies
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.profiles;
 CREATE POLICY "Public profiles are viewable by everyone." ON public.profiles
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can insert their own profile." ON public.profiles;
 CREATE POLICY "Users can insert their own profile." ON public.profiles
   FOR INSERT WITH CHECK (auth.uid() = "uid");
 
+DROP POLICY IF EXISTS "Users and admins can update profiles." ON public.profiles;
 CREATE POLICY "Users and admins can update profiles." ON public.profiles
   FOR UPDATE USING (
     auth.uid() = "uid" OR 
     EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin'))
   );
 
+DROP POLICY IF EXISTS "Admins can delete profiles." ON public.profiles;
 CREATE POLICY "Admins can delete profiles." ON public.profiles
   FOR DELETE USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin'))
   );
 
 -- Requisitions Policies
+DROP POLICY IF EXISTS "Public can view individual requisitions for verification." ON public.requisitions;
 CREATE POLICY "Public can view individual requisitions for verification." ON public.requisitions
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users and admins can view relevant requisitions." ON public.requisitions;
 CREATE POLICY "Users and admins can view relevant requisitions." ON public.requisitions
   FOR SELECT USING (
     auth.uid() = "creatorId" OR 
@@ -106,9 +109,11 @@ CREATE POLICY "Users and admins can view relevant requisitions." ON public.requi
     EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin', 'ADMIN', 'Director', 'Treasurer', 'Finance HOD', 'TREASURER', 'FINANCE_HOD', 'Accounting HOD'))
   );
 
+DROP POLICY IF EXISTS "Users can create requisitions." ON public.requisitions;
 CREATE POLICY "Users can create requisitions." ON public.requisitions
   FOR INSERT WITH CHECK (auth.uid() = "creatorId");
 
+DROP POLICY IF EXISTS "Users and admins can update requisitions." ON public.requisitions;
 CREATE POLICY "Users and admins can update requisitions." ON public.requisitions
   FOR UPDATE USING (
     (auth.uid() = "creatorId" AND "status" = 'pending') OR
@@ -121,6 +126,7 @@ CREATE POLICY "Users and admins can update requisitions." ON public.requisitions
     )
   );
 
+DROP POLICY IF EXISTS "Admins and creators can delete requisitions." ON public.requisitions;
 CREATE POLICY "Admins and creators can delete requisitions." ON public.requisitions
   FOR DELETE USING (
     (auth.uid() = "creatorId" AND "status" = 'pending') OR
@@ -128,8 +134,10 @@ CREATE POLICY "Admins and creators can delete requisitions." ON public.requisiti
   );
 
 -- Logs Policies
+DROP POLICY IF EXISTS "Public can insert help requests and auth events." ON public.activity_logs;
 CREATE POLICY "Public can insert help requests and auth events." ON public.activity_logs
   FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Authenticated users can view logs." ON public.activity_logs;
 CREATE POLICY "Authenticated users can view logs." ON public.activity_logs
   FOR SELECT USING (auth.role() = 'authenticated');

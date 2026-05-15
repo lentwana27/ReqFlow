@@ -808,6 +808,40 @@ REQFLOW PRO System
         return;
       }
 
+      // Handle Processed (Issued) Notification
+      if (requisition.status === 'processed') {
+        const { data: creatorProfile } = await supabase.from('profiles').select('email, name').eq('uid', requisition.creatorId).maybeSingle();
+        if (creatorProfile?.email) {
+          const changeText = requisition.changeReturned && requisition.changeReturned > 0 
+            ? `\nCHANGE TO BE RETURNED: ${requisition.currency || '$'}${requisition.changeReturned.toFixed(2)}\nPlease return this amount to the office promptly.\n`
+            : '';
+            
+          console.log(`[Notification] Sending processed notice to ${creatorProfile.email}...`);
+          await fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: creatorProfile.email,
+              subject: `Issued: Requisition ${requisition.requisitionNumber} is READY`,
+              body: `
+Hello ${creatorProfile.name},
+
+Your requisition ${requisition.requisitionNumber} has been ISSUED by the Treasurer.
+
+AMOUNT ISSUED: ${requisition.currency || '$'}${requisition.amountIssued?.toFixed(2) || requisition.totalAmount.toFixed(2)}
+${changeText}
+You can view the details and verification token here:
+${requisitionLink}
+
+Thank you,
+REQFLOW PRO System
+              `.trim()
+            })
+          }).catch(console.error);
+        }
+        return;
+      }
+
       const nextRole = approvals[currentStage]?.role;
       if (!nextRole) return;
       

@@ -111,6 +111,8 @@ export interface Requisition {
   attachments?: Attachment[];
   notes?: string;
   rejectionReason?: string;
+  amountIssued?: number;
+  changeReturned?: number;
   createdAt: any;
   updatedAt: any;
 }

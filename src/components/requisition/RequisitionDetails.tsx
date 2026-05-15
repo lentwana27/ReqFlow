@@ -22,6 +22,8 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
   const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState<'approved' | 'rejected' | 'processed' | null>(null);
+  const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
+  const [amountIssued, setAmountIssued] = useState<string>('');
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -178,13 +180,14 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     return false;
   };
 
-  const handleUpdateStatus = async (newStatus: 'approved' | 'rejected' | 'processed', isApproval = false, overrideComment?: string) => {
+  const handleUpdateStatus = async (newStatus: 'approved' | 'rejected' | 'processed', isApproval = false, overrideComment?: string, customUpdates: any = {}) => {
     setIsProcessing(newStatus);
     const activeComment = overrideComment ?? comment;
     
     try {
       const updates: any = {
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        ...customUpdates
       };
 
       if (newStatus === 'rejected' && isApproval) {
@@ -467,6 +470,18 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                 <div>
                   <label className="input-label">Written To</label>
                   <p className="text-sm font-semibold text-blue-900">{requisition.writtenTo || 'N/A'}</p>
+                </div>
+              )}
+              {requisition.amountIssued !== undefined && requisition.amountIssued !== null && (
+                <div className="bg-green-50 p-2 border border-green-100 rounded-sm">
+                  <label className="text-[9px] uppercase font-bold text-green-600 block">Amount Issued</label>
+                  <p className="text-sm font-bold text-green-800">{symbol}{requisition.amountIssued.toFixed(2)}{suffix}</p>
+                </div>
+              )}
+              {requisition.changeReturned !== undefined && requisition.changeReturned > 0 && (
+                <div className="bg-amber-50 p-2 border border-amber-100 rounded-sm">
+                  <label className="text-[9px] uppercase font-bold text-amber-600 block">Change to be Returned</label>
+                  <p className="text-sm font-bold text-amber-800">{symbol}{requisition.changeReturned.toFixed(2)}{suffix}</p>
                 </div>
               )}
             </div>
@@ -781,7 +796,10 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                 </p>
               </div>
               <button 
-                onClick={() => handleUpdateStatus('processed')}
+                onClick={() => {
+                  setAmountIssued(requisition.totalAmount.toString());
+                  setIsIssueModalOpen(true);
+                }}
                 disabled={!!isProcessing || isSuccess}
                 className={`w-full btn-primary border-none flex items-center justify-center gap-2 h-12 transition-all duration-300 ${
                   isSuccess ? 'bg-green-600' : 'bg-blue-900 hover:bg-black'
@@ -882,6 +900,91 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                     className="flex-1 bg-red-600 text-white py-2 rounded-sm text-sm font-bold uppercase tracking-widest hover:bg-red-700 transition-colors disabled:opacity-50"
                   >
                     {isProcessing === 'rejected' ? 'Rejecting...' : 'Confirm Rejection'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isIssueModalOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-sm shadow-2xl overflow-hidden border border-gray-100"
+            >
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-blue-50">
+                <div className="flex items-center gap-2 text-blue-700">
+                  <ArrowRight className="w-5 h-5" />
+                  <h3 className="font-bold text-sm uppercase tracking-tight">Record Disbursement</h3>
+                </div>
+                <button onClick={() => setIsIssueModalOpen(false)} className="text-blue-400 hover:text-blue-700">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-6">
+                <div className="flex justify-between items-center bg-gray-50 p-4 rounded-sm border border-gray-100">
+                  <span className="text-xs font-bold text-gray-500 uppercase">Total Requested:</span>
+                  <span className="text-lg font-mono font-bold">{symbol}{requisition.totalAmount.toFixed(2)}{suffix}</span>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-gray-400">Amount Actually Issued ({currency})</label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    autoFocus
+                    placeholder="Enter amount issued..."
+                    value={amountIssued}
+                    onChange={(e) => setAmountIssued(e.target.value)}
+                    className="w-full text-2xl font-bold p-4 border border-gray-200 rounded-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                  />
+                </div>
+
+                {parseFloat(amountIssued) > requisition.totalAmount && (
+                  <div className="bg-amber-50 border border-amber-100 p-4 rounded-sm flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-bold text-amber-900 uppercase">Change Detected</p>
+                      <p className="text-xl font-black text-amber-700 mt-1">
+                        {symbol}{(parseFloat(amountIssued) - requisition.totalAmount).toFixed(2)}{suffix}
+                      </p>
+                      <p className="text-[10px] text-amber-600 mt-1">This amount must be returned to the office.</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 pt-4">
+                  <button 
+                    onClick={() => setIsIssueModalOpen(false)}
+                    className="flex-1 px-4 py-2 text-sm font-bold text-gray-400 hover:text-gray-600 uppercase tracking-widest"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      const issued = parseFloat(amountIssued);
+                      if (isNaN(issued) || issued <= 0) {
+                        showToast('Please enter a valid amount issued', 'error');
+                        return;
+                      }
+                      
+                      const change = issued > requisition.totalAmount ? (issued - requisition.totalAmount) : 0;
+                      
+                      await handleUpdateStatus('processed', false, undefined, {
+                        amountIssued: issued,
+                        changeReturned: change
+                      });
+                      setIsIssueModalOpen(false);
+                    }}
+                    disabled={!!isProcessing}
+                    className="flex-1 bg-blue-900 text-white py-4 rounded-sm text-sm font-bold uppercase tracking-widest hover:bg-black transition-colors disabled:opacity-50 shadow-lg"
+                  >
+                    {isProcessing === 'processed' ? 'Processing...' : 'Confirm Disbursement'}
                   </button>
                 </div>
               </div>
