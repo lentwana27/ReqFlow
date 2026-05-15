@@ -538,6 +538,9 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                     } else if (t === RequisitionType.IT) {
                       isAllowed = userDept === Department.IT;
                       restrictionMsg = 'IT Dept Only';
+                    } else if (t === RequisitionType.FINANCE) {
+                      isAllowed = userDept === Department.FINANCE;
+                      restrictionMsg = 'Finance Dept Only';
                     }
                     
                     return (

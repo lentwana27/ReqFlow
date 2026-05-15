@@ -134,7 +134,12 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     // Block unverified users from approving
     if (!userProfile.isVerified && userProfile.username !== 'admin') return false;
 
-    return checkRoleMatch(userProfile, currentApproval.role, requisition.department);
+    if (checkRoleMatch(userProfile, currentApproval.role, requisition.department)) return true;
+
+    // Special case: Director can override Finance Requisition at any stage
+    if (userProfile.role === UserRole.DIRECTOR && requisition.type === RequisitionType.FINANCE) return true;
+
+    return false;
   };
 
   const handleUpdateStatus = async (newStatus: 'approved' | 'rejected' | 'processed', isApproval = false, overrideComment?: string) => {
@@ -173,17 +178,38 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
 
         // 2. If approved, check for future stages that this user ALSO fulfills
         if (newStatus === 'approved') {
-          for (let i = requisition.currentStage + 1; i < newApprovals.length; i++) {
-            if (checkRoleMatch(userProfile, newApprovals[i].role, requisition.department)) {
-              newApprovals[i] = {
-                ...newApprovals[i],
-                status: 'approved',
-                approverId: userProfile.uid,
-                approverName: userProfile.name,
-                timestamp,
-                comment: `Auto-approved: User holds multiple roles (${newApprovals[i].role})`,
-                signatureId: `SIG-AUTO-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-              };
+          // Special case: Director approves Finance Requisition instantly completes it
+          const isDirector = userProfile.role === UserRole.DIRECTOR;
+          const isFinanceReq = requisition.type === RequisitionType.FINANCE;
+
+          if (isDirector && isFinanceReq) {
+            for (let i = requisition.currentStage + 1; i < newApprovals.length; i++) {
+              if (newApprovals[i].status === 'pending') {
+                newApprovals[i] = {
+                  ...newApprovals[i],
+                  status: 'approved',
+                  approverId: userProfile.uid,
+                  approverName: userProfile.name,
+                  timestamp,
+                  comment: `Bypassed: Director sign-off completed requisition instantly.`,
+                  signatureId: `SIG-OVERRIDE-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+                };
+              }
+            }
+          } else {
+            // Standard multi-role auto-approval
+            for (let i = requisition.currentStage + 1; i < newApprovals.length; i++) {
+              if (checkRoleMatch(userProfile, newApprovals[i].role, requisition.department)) {
+                newApprovals[i] = {
+                  ...newApprovals[i],
+                  status: 'approved',
+                  approverId: userProfile.uid,
+                  approverName: userProfile.name,
+                  timestamp,
+                  comment: `Auto-approved: User holds multiple roles (${newApprovals[i].role})`,
+                  signatureId: `SIG-AUTO-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+                };
+              }
             }
           }
         }
@@ -309,9 +335,12 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
             </div>
             <div>
               <h2 className="text-lg font-bold tracking-tight">Requisition {requisition.requisitionNumber}</h2>
-              <p className="text-[10px] font-mono text-gray-400 uppercase">
-                {requisition.type === 'Quotations' ? requisition.type : `${requisition.type} Requisition`}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-mono text-gray-400 uppercase">
+                  {requisition.type === 'Quotations' ? requisition.type : `${requisition.type} Requisition`}
+                </p>
+                <span className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded-sm font-bold text-gray-600">#{requisition.sequenceNumber || '---'}</span>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">

@@ -4,7 +4,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { UserProfile, UserRole, Department, Requisition, ActivityLog } from '../types';
+import { UserProfile, UserRole, Department, Requisition, ActivityLog, RequisitionType } from '../types';
 import { localDb } from './localDb';
 import { getPublicOrigin } from '../lib/urls';
 
@@ -41,7 +41,7 @@ export const authService = {
           .from('profiles')
           .select('email, status')
           .eq('username', input.toLowerCase())
-          .single();
+          .maybeSingle();
         
         if (profile?.email) {
           email = profile.email;
@@ -65,7 +65,7 @@ export const authService = {
         .from('profiles')
         .select('*')
         .eq('uid', data.user.id)
-        .single();
+        .maybeSingle();
 
       if (profileError || !profile) {
         // Recovery logic: Profile is missing but login was successful
@@ -133,7 +133,7 @@ export const authService = {
         .from('profiles')
         .select('uid, username')
         .eq('username', normalizedUsername)
-        .single();
+        .maybeSingle();
       
       if (existingProfile) {
         throw new Error(`The username "@${normalizedUsername}" is already taken. Please choose another.`);
@@ -219,7 +219,7 @@ export const authService = {
         .from('profiles')
         .select('*')
         .eq('uid', session.user.id)
-        .single();
+        .maybeSingle();
       
       if (profile) {
         cachedProfile = profile as UserProfile;
@@ -263,7 +263,7 @@ export const authService = {
         .from('profiles')
         .select('email')
         .eq('username', input.toLowerCase())
-        .single();
+        .maybeSingle();
       
       if (profile?.email) {
         email = profile.email;
@@ -272,15 +272,22 @@ export const authService = {
       }
     }
 
-    const response = await fetch('/api/auth/forgot-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
 
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Failed to send reset email');
-    return result;
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to send reset email');
+      return result;
+    } catch (err: any) {
+      if (err.message === 'Failed to fetch') {
+        throw new Error('Connection to authentication server failed. The backend service might be temporary unavailable.');
+      }
+      throw err;
+    }
   },
 
   updateProfile: async (updates: Partial<UserProfile>) => {
@@ -365,18 +372,25 @@ export const userService = {
     }
   },
   resetPassword: async (uid: string, newPassword: string) => {
-    const response = await fetch('/api/admin/reset-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: uid, newPassword })
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to reset password');
+    try {
+      const response = await fetch('/api/admin/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: uid, newPassword })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to reset password');
+      }
+      
+      return response.json();
+    } catch (err: any) {
+      if (err.message === 'Failed to fetch') {
+        throw new Error('Connection to admin server failed. Please check if the backend is running.');
+      }
+      throw err;
     }
-    
-    return response.json();
   }
 };
 
@@ -414,7 +428,7 @@ export const requisitionService = {
         if (isFinanceOrTreasurer && isApprovedOrProcessed) {
           // If Treasurer, further restrict by allowed types
           if (userProfile.role === UserRole.TREASURER) {
-            const allowedTypes = ['Admin', 'Purchasing', 'Workshop', 'Fuel'];
+            const allowedTypes = [RequisitionType.ADMIN, RequisitionType.PURCHASING, RequisitionType.WORKSHOP, RequisitionType.FUEL, RequisitionType.FINANCE];
             return allowedTypes.includes(req.type as any);
           }
           return true;
@@ -447,6 +461,19 @@ export const requisitionService = {
     try {
       console.log('[Requisition] Creating...', payload);
       
+      // 1. Get sequence number (get total count + 1)
+      const { count, error: countError } = await supabase
+        .from('requisitions')
+        .select('*', { count: 'exact', head: true });
+      
+      if (countError) console.warn('Could not fetch count for sequence number:', countError);
+      const nextSeq = (count || 0) + 1;
+      const sequenceNumber = nextSeq.toString().padStart(3, '0');
+
+      // 2. Random Requisition Number if not provided or to ensure randomness
+      const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const requisitionNumber = `REQ-${randomPart}-${sequenceNumber}`;
+
       // Verify profile exists to avoid FK violation
       const { data: profile, error: profileCheckError } = await supabase
         .from('profiles')
@@ -469,6 +496,8 @@ export const requisitionService = {
 
       let insertPayload = {
         ...payload,
+        requisitionNumber,
+        sequenceNumber,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -634,7 +663,7 @@ export const notificationService = {
         
         // Treasurer only handles specific types
         if (proc.role === UserRole.TREASURER) {
-          const allowedTypes = ['Admin', 'Purchasing', 'Workshop', 'Fuel'];
+          const allowedTypes = [RequisitionType.ADMIN, RequisitionType.PURCHASING, RequisitionType.WORKSHOP, RequisitionType.FUEL, RequisitionType.FINANCE];
           if (!allowedTypes.includes(requisition.type as any)) continue;
         }
 
@@ -689,7 +718,7 @@ REQFLOW PRO System
 
       // Handle Rejection Notification
       if (requisition.status === 'rejected') {
-        const { data: creatorProfile } = await supabase.from('profiles').select('email, name').eq('uid', requisition.creatorId).single();
+      const { data: creatorProfile } = await supabase.from('profiles').select('email, name').eq('uid', requisition.creatorId).maybeSingle();
         if (creatorProfile?.email) {
           console.log(`[Notification] Sending rejection notice to ${creatorProfile.email}...`);
           await fetch('/api/notify', {
@@ -773,7 +802,7 @@ REQFLOW PRO System
       }
 
       // Get requester email for CC?
-      const { data: creatorProfile } = await supabase.from('profiles').select('email').eq('uid', requisition.creatorId).single();
+      const { data: creatorProfile } = await supabase.from('profiles').select('email').eq('uid', requisition.creatorId).maybeSingle();
       const creatorEmail = creatorProfile?.email;
 
       for (const approver of activeApprovers) {
@@ -914,13 +943,20 @@ export const auditService = {
 
 export const customAuthService = {
   completePasswordReset: async (data: any) => {
-    const response = await fetch('/api/auth/reset-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Failed to reset password');
-    return result;
+    try {
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to reset password');
+      return result;
+    } catch (err: any) {
+      if (err.message === 'Failed to fetch') {
+        throw new Error('Could not connect to the reset server. Please try again in 1 minute.');
+      }
+      throw err;
+    }
   }
 };

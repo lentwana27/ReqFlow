@@ -482,7 +482,10 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                     <td className="px-6 py-4 font-mono text-xs font-bold">
                       <div className="flex items-center gap-2">
                         {needsMyAction && <Clock className="w-3 h-3 text-amber-500" />}
-                        {req.requisitionNumber}
+                        <div className="flex flex-col">
+                          <span>{req.requisitionNumber}</span>
+                          <span className="text-[10px] text-gray-400">#{req.sequenceNumber || '---'}</span>
+                        </div>
                       </div>
                     </td>
                     

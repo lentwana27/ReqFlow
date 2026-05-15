@@ -126,7 +126,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
       .eq('token', token)
       .eq('email', email)
       .gt('expiresAt', new Date().toISOString())
-      .single();
+      .maybeSingle();
 
     if (tokenError || !tokenData) {
       return res.status(400).json({ error: 'Invalid or expired recovery link. Please request a new one.' });

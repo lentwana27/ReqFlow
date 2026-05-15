@@ -32,19 +32,24 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   doc.text(requisition.requisitionNumber, 55, 45);
 
   doc.setFont('', 'bold');
-  doc.text('Department:', 14, 52);
+  doc.text('Sequence Number:', 14, 52);
   doc.setFont('', 'normal');
-  doc.text(requisition.department, 55, 52);
+  doc.text(requisition.sequenceNumber || 'N/A', 55, 52);
 
   doc.setFont('', 'bold');
-  doc.text('Requested By:', 14, 59);
+  doc.text('Department:', 14, 59);
   doc.setFont('', 'normal');
-  doc.text(requisition.creatorName, 55, 59);
+  doc.text(requisition.department, 55, 59);
 
   doc.setFont('', 'bold');
-  doc.text('Written To:', 14, 66);
+  doc.text('Requested By:', 14, 66);
   doc.setFont('', 'normal');
-  doc.text(requisition.writtenTo || 'N/A', 55, 66);
+  doc.text(requisition.creatorName, 55, 66);
+
+  doc.setFont('', 'bold');
+  doc.text('Written To:', 14, 73);
+  doc.setFont('', 'normal');
+  doc.text(requisition.writtenTo || 'N/A', 55, 73);
 
   doc.setFont('', 'bold');
   doc.text('Date Created:', pageWidth - 80, 45);
@@ -62,18 +67,18 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   if (requisition.status === 'rejected' && requisition.rejectionReason) {
     doc.setFont('', 'bold');
     doc.setTextColor(200, 0, 0);
-    doc.text('REJECTION REASON:', 14, 73);
+    doc.text('REJECTION REASON:', 14, 80);
     doc.setFont('', 'normal');
     doc.setFontSize(9);
     const splitReason = doc.splitTextToSize(requisition.rejectionReason, pageWidth - 65);
-    doc.text(splitReason, 55, 73);
+    doc.text(splitReason, 55, 80);
     doc.setFontSize(10);
     doc.setTextColor(26, 26, 26);
   }
 
   // Notes if they exist
   if (requisition.notes) {
-    const notesY = (requisition.status === 'rejected' && requisition.rejectionReason) ? 80 : 73;
+    const notesY = (requisition.status === 'rejected' && requisition.rejectionReason) ? 87 : 80;
     doc.setFont('', 'bold');
     doc.text('Notes:', 14, notesY);
     doc.setFont('', 'normal');
@@ -90,17 +95,17 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   const suffix = currency !== 'USD' ? ` ${currency}` : '';
 
   // Calculate table start Y dynamically
-  let tableStartY = 85;
+  let tableStartY = 95;
   if (requisition.notes) {
-    const notesY = (requisition.status === 'rejected' && requisition.rejectionReason) ? 80 : 73;
+    const notesY = (requisition.status === 'rejected' && requisition.rejectionReason) ? 87 : 80;
     const splitNotes = doc.splitTextToSize(requisition.notes, pageWidth - 65);
     tableStartY = notesY + (splitNotes.length * 5) + 5;
   } else if (requisition.status === 'rejected' && requisition.rejectionReason) {
     const splitReason = doc.splitTextToSize(requisition.rejectionReason, pageWidth - 65);
-    tableStartY = 73 + (splitReason.length * 5) + 5;
+    tableStartY = 80 + (splitReason.length * 5) + 5;
   }
   
-  if (tableStartY < 85) tableStartY = 85;
+  if (tableStartY < 95) tableStartY = 95;
 
   // Items Table
   autoTable(doc, {
