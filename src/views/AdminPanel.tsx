@@ -29,6 +29,7 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
   const [reqSearchTerm, setReqSearchTerm] = useState('');
   const [reqStatusFilter, setReqStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'processed'>('all');
   const [reqDateFilter, setReqDateFilter] = useState('');
+  const [currentLogo, setCurrentLogo] = useState<string | null>(null);
 
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [updatingUids, setUpdatingUids] = useState<string[]>([]);
@@ -61,6 +62,9 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
       } else if (targetTab === 'audit') {
         const localLogs = await auditService.list();
         setAuditLogs(localLogs);
+      } else if (targetTab === 'branding') {
+        const logo = await brandingService.getLogo();
+        setCurrentLogo(logo);
       }
     } catch (err) {
       console.error('Fetch error:', err);
@@ -847,6 +851,7 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
                           try {
                             setLoading(true);
                             await brandingService.uploadLogo(base64);
+                            setCurrentLogo(base64);
                             showToast('Logo updated successfully! Changes will take effect on new PDFs.');
                             
                             // Log the change
@@ -875,16 +880,20 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
                   <h4 className="text-sm font-bold mb-2">Current Logo Preview</h4>
                   <div className="bg-gray-50 p-4 rounded border border-gray-100 flex items-center justify-center">
                     <img 
-                      src={`/logo.png?v=${Date.now()}`} 
+                      src={currentLogo || `/logo.png?v=${Date.now()}`} 
                       alt="Current Logo" 
                       className="max-h-24 object-contain"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://placehold.co/400x150?text=No+Logo+Uploaded';
+                        if (currentLogo) {
+                          setCurrentLogo(null);
+                        } else {
+                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x150?text=No+Logo+Uploaded';
+                        }
                       }}
                     />
                   </div>
                   <p className="text-[10px] text-gray-400 mt-2 italic text-center">
-                    Note: If the preview shows a placeholder, it means logo.png is not yet uploaded to the public directory.
+                    Note: The logo shown above is the one currently stored in the system and will appear on all generated PDFs.
                   </p>
                 </div>
               </div>

@@ -347,9 +347,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
       setIsProcessing(null);
 
       setTimeout(() => {
-        if (!isApproval || newStatus === 'rejected' || requisition.currentStage === requisition.approvals.length - 1) {
-          onClose();
-        }
+        onClose();
         setComment('');
         setIsSuccess(false);
       }, 500);
@@ -528,21 +526,23 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
             </div>
           </div>
 
-          <div className="space-y-4">
+      <div className="space-y-4">
             <label className="input-label">Requested Items</label>
             <div className="border border-gray-100 rounded-sm overflow-hidden text-sm">
               {(() => {
-                const isQR = requisition.type === RequisitionType.SHOP_QR || requisition.type === RequisitionType.WAREHOUSE_QR;
+                const hasCodeColumn = requisition.type === RequisitionType.WAREHOUSE || requisition.type === RequisitionType.SHOP_USE || requisition.type === RequisitionType.SHOP_QR || requisition.type === RequisitionType.WAREHOUSE_QR || requisition.type === RequisitionType.QUOTATIONS;
+                const hasPricingColumns = requisition.type !== RequisitionType.SHOP_QR && requisition.type !== RequisitionType.WAREHOUSE_QR && requisition.type !== RequisitionType.FUEL;
                 const isFuel = requisition.type === RequisitionType.FUEL;
+                
                 return (
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-100">
                       <tr className="font-mono text-[10px] uppercase text-gray-500">
-                        {isQR && <th className="text-left px-4 py-3">Code</th>}
+                        {hasCodeColumn && <th className="text-left px-4 py-3">Code</th>}
                         <th className="text-left px-4 py-3">Description</th>
                         <th className="text-center px-4 py-3">{isFuel ? 'Litres' : 'Qty'}</th>
                         {isFuel && <th className="text-right px-4 py-3">Type</th>}
-                        {!isQR && !isFuel && (
+                        {hasPricingColumns && (
                           <>
                             <th className="text-right px-4 py-3">Rate</th>
                             <th className="text-right px-4 py-3">Total</th>
@@ -553,11 +553,11 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                     <tbody className="divide-y divide-gray-100 font-medium">
                       {requisition.items.map((item, idx) => (
                         <tr key={idx}>
-                          {isQR && <td className="px-4 py-3 font-mono text-blue-600 font-bold">{item.code || 'N/A'}</td>}
+                          {hasCodeColumn && <td className="px-4 py-3 font-mono text-blue-600 font-bold">{item.code || 'N/A'}</td>}
                           <td className="px-4 py-3">{item.description}</td>
                           <td className="px-4 py-3 text-center">{item.qty}{isFuel ? ' L' : ''}</td>
                           {isFuel && <td className="px-4 py-3 text-right font-bold">{item.fuelType || 'Diesel'}</td>}
-                          {!isQR && !isFuel && (
+                          {hasPricingColumns && (
                             <>
                               <td className="px-4 py-3 text-right">{symbol}{item.unitCost.toFixed(2)}{suffix}</td>
                               <td className="px-4 py-3 text-right font-bold">{symbol}{item.totalCost.toFixed(2)}{suffix}</td>
@@ -566,10 +566,10 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                         </tr>
                       ))}
                     </tbody>
-                    {!isQR && !isFuel && (
+                    {hasPricingColumns && (
                       <tfoot className="bg-gray-50/50">
                         <tr className="font-bold">
-                          <td colSpan={3} className="px-4 py-4 text-right uppercase tracking-wider text-[10px]">Total Amount ({currency})</td>
+                          <td colSpan={hasCodeColumn ? 4 : 3} className="px-4 py-4 text-right uppercase tracking-wider text-[10px]">Total Amount ({currency})</td>
                           <td className="px-4 py-4 text-right font-mono text-base font-bold">{symbol}{requisition.totalAmount.toFixed(2)}{suffix}</td>
                         </tr>
                       </tfoot>
@@ -628,112 +628,114 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
             </div>
           )}
 
-          <div className="space-y-4">
-            <label className="input-label">Approval Workflow</label>
-            <div className="space-y-4 relative">
-              {requisition.approvals.map((approval, idx) => (
-                <div key={idx} className={`flex items-start gap-4 p-4 rounded-sm border ${
-                  idx === requisition.currentStage && requisition.status === 'pending'
-                    ? 'border-yellow-200 bg-yellow-50/30' 
-                    : approval.status === 'approved' 
-                      ? 'border-green-100 bg-green-50/20'
-                      : approval.status === 'rejected'
-                        ? 'border-red-100 bg-red-50/20'
-                        : 'border-gray-100 bg-gray-50/50 opacity-60'
-                }`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border mt-0.5 ${
-                    approval.status === 'approved' ? 'bg-green-500 border-green-600 text-white' :
-                    approval.status === 'rejected' ? 'bg-red-500 border-red-600 text-white' :
-                    idx === requisition.currentStage && requisition.status === 'pending' ? 'bg-yellow-400 border-yellow-500 text-white' :
-                    'bg-white border-gray-200 text-gray-400'
+          {requisition.type !== 'Quotations' && (
+            <div className="space-y-4">
+              <label className="input-label">Approval Workflow</label>
+              <div className="space-y-4 relative">
+                {requisition.approvals.map((approval, idx) => (
+                  <div key={idx} className={`flex items-start gap-4 p-4 rounded-sm border ${
+                    idx === requisition.currentStage && requisition.status === 'pending'
+                      ? 'border-yellow-200 bg-yellow-50/30' 
+                      : approval.status === 'approved' 
+                        ? 'border-green-100 bg-green-50/20'
+                        : approval.status === 'rejected'
+                          ? 'border-red-100 bg-red-50/20'
+                          : 'border-gray-100 bg-gray-50/50 opacity-60'
                   }`}>
-                    {approval.status === 'approved' ? <Check className="w-4 h-4" /> : 
-                     approval.status === 'rejected' ? <XCircle className="w-4 h-4" /> : 
-                     <Clock className="w-4 h-4" />}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold uppercase tracking-tight">{approval.role}</p>
-                        {approval.signatureId && (
-                          <div className="flex items-center gap-2">
-                            <div 
-                              className="p-1.5 bg-white border border-gray-200 rounded-sm shadow-sm hover:scale-[2] transition-transform cursor-pointer origin-left z-20"
-                              title="Scan to verify authorization"
-                            >
-                              <QRCodeCanvas 
-                                value={`${getPublicOrigin()}?verify=${approval.signatureId}&reqId=${requisition.id}`} 
-                                size={40}
-                                level="M"
-                              />
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border mt-0.5 ${
+                      approval.status === 'approved' ? 'bg-green-500 border-green-600 text-white' :
+                      approval.status === 'rejected' ? 'bg-red-500 border-red-600 text-white' :
+                      idx === requisition.currentStage && requisition.status === 'pending' ? 'bg-yellow-400 border-yellow-500 text-white' :
+                      'bg-white border-gray-200 text-gray-400'
+                    }`}>
+                      {approval.status === 'approved' ? <Check className="w-4 h-4" /> : 
+                       approval.status === 'rejected' ? <XCircle className="w-4 h-4" /> : 
+                       <Clock className="w-4 h-4" />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold uppercase tracking-tight">{approval.role}</p>
+                          {approval.signatureId && (
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="p-1.5 bg-white border border-gray-200 rounded-sm shadow-sm hover:scale-[2] transition-transform cursor-pointer origin-left z-20"
+                                title="Scan to verify authorization"
+                              >
+                                <QRCodeCanvas 
+                                  value={`${getPublicOrigin()}?verify=${approval.signatureId}&reqId=${requisition.id}`} 
+                                  size={40}
+                                  level="M"
+                                />
+                              </div>
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter hidden sm:inline">Scan to Verify</span>
                             </div>
-                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter hidden sm:inline">Scan to Verify</span>
-                          </div>
+                          )}
+                        </div>
+                        {approval.timestamp && (
+                          <span className="text-[10px] font-mono text-gray-400">
+                            {(() => {
+                              try {
+                                const d = typeof approval.timestamp === 'string' ? parseISO(approval.timestamp) : new Date(approval.timestamp as any);
+                                return format(d, 'MMM dd, HH:mm');
+                              } catch (e) {
+                                 return 'Invalid Date';
+                              }
+                            })() }
+                          </span>
                         )}
                       </div>
-                      {approval.timestamp && (
-                        <span className="text-[10px] font-mono text-gray-400">
-                          {(() => {
-                            try {
-                              const d = typeof approval.timestamp === 'string' ? parseISO(approval.timestamp) : new Date(approval.timestamp as any);
-                              return format(d, 'MMM dd, HH:mm');
-                            } catch (e) {
-                              return 'Invalid Date';
-                            }
-                          })()}
-                        </span>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {approval.status === 'pending' ? 'Waiting for approval' : 
+                         approval.status === 'approved' ? (approval.role.includes('Director') ? `Approved by ${approval.approverName}` : 'Approved') : approval.status}
+                      </p>
+                      {approval.comment && (
+                        <p className="text-xs italic text-gray-400 mt-2 bg-white p-2 border border-gray-100 rounded-sm">
+                          "{approval.comment}"
+                        </p>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {approval.status === 'pending' ? 'Waiting for approval' : 
-                       approval.approverName ? `Approved by ${approval.approverName}` : approval.status}
-                    </p>
-                    {approval.comment && (
-                      <p className="text-xs italic text-gray-400 mt-2 bg-white p-2 border border-gray-100 rounded-sm">
-                        "{approval.comment}"
-                      </p>
-                    )}
                   </div>
-                </div>
-              ))}
+                ))}
 
-              {/* Disbursement Signature */}
-              {requisition.issuedInfo && (
-                <div className="flex items-start gap-4 p-4 rounded-sm border border-blue-100 bg-blue-50/20">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border bg-blue-600 border-blue-700 text-white mt-0.5">
-                    <Check className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold uppercase tracking-tight">DISBURSEMENT / ISSUANCE</p>
-                        <div 
-                          className="p-1.5 bg-white border border-gray-200 rounded-sm shadow-sm hover:scale-[2] transition-transform cursor-pointer origin-left z-20"
-                          title="Scan to verify issuance"
-                        >
-                          <QRCodeCanvas 
-                            value={`${getPublicOrigin()}?verify=${requisition.issuedInfo.signatureId}&reqId=${requisition.id}`} 
-                            size={40}
-                            level="M"
-                          />
+                {/* Disbursement Signature */}
+                {requisition.issuedInfo && (
+                  <div className="flex items-start gap-4 p-4 rounded-sm border border-blue-100 bg-blue-50/20">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border bg-blue-600 border-blue-700 text-white mt-0.5">
+                      <Check className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold uppercase tracking-tight">DISBURSEMENT / ISSUANCE</p>
+                          <div 
+                            className="p-1.5 bg-white border border-gray-200 rounded-sm shadow-sm hover:scale-[2] transition-transform cursor-pointer origin-left z-20"
+                            title="Scan to verify issuance"
+                          >
+                            <QRCodeCanvas 
+                              value={`${getPublicOrigin()}?verify=${requisition.issuedInfo.signatureId}&reqId=${requisition.id}`} 
+                              size={40}
+                              level="M"
+                            />
+                          </div>
+                          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter hidden sm:inline">Scan to Verify</span>
                         </div>
-                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter hidden sm:inline">Scan to Verify</span>
+                        <span className="text-[10px] font-mono text-gray-400">
+                          {format(parseISO(requisition.issuedInfo.timestamp), 'MMM dd, HH:mm')}
+                        </span>
                       </div>
-                      <span className="text-[10px] font-mono text-gray-400">
-                        {format(parseISO(requisition.issuedInfo.timestamp), 'MMM dd, HH:mm')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Issued by {requisition.issuedInfo.userName}
-                    </p>
-                    <div className="mt-2 py-1 px-2 border border-blue-100 bg-white inline-block text-[10px] font-mono text-blue-700 rounded-sm">
-                      TOKEN: {requisition.issuedInfo.signatureId}
+                      <p className="text-xs text-gray-500 mt-1">
+                        Issued by {requisition.issuedInfo.userName}
+                      </p>
+                      <div className="mt-2 py-1 px-2 border border-blue-100 bg-white inline-block text-[10px] font-mono text-blue-700 rounded-sm">
+                        TOKEN: {requisition.issuedInfo.signatureId}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="p-6 border-t border-gray-100 bg-gray-50">

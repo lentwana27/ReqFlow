@@ -1,0 +1,26 @@
+{
+  "entities": {
+    "Branding": {
+      "title": "Branding",
+      "description": "System branding settings like logo.",
+      "type": "object",
+      "properties": {
+        "logo": {
+          "type": "string",
+          "description": "Base64 encoded logo data or URL."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["logo"]
+    }
+  },
+  "firestore": {
+    "settings/branding": {
+      "schema": "Branding",
+      "description": "Global branding configuration."
+    }
+  }
+}

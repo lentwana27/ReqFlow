@@ -1,9 +1,10 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format, parseISO } from 'date-fns';
-import { Requisition } from '../types';
+import { Requisition} from '../types';
 import QRCode from 'qrcode';
 import { getPublicOrigin } from './urls';
+import { brandingService } from '../services/api';
 
 export const generateRequisitionPDF = async (requisition: Requisition) => {
   const doc = new jsPDF();
@@ -13,7 +14,7 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   let textStartY = 15;
   const isQuotation = requisition.type === 'Quotations';
 
-  // Logo Support: The user can upload logo.png to /public/
+  // Logo Support: The user can upload logo.png or save to Firestore
   try {
     const loadImg = (url: string): Promise<HTMLImageElement | null> => {
       return new Promise((resolve) => {
@@ -24,7 +25,11 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
       });
     };
 
-    const logo = await loadImg('/logo.png');
+    // Try Firestore first for persistence, fallback to local logo.png
+    const dbLogo = await brandingService.getLogo();
+    const logoSource = dbLogo || '/logo.png';
+    
+    const logo = await loadImg(logoSource);
     if (logo) {
       const aspect = logo.width / logo.height;
       const width = 60;
@@ -33,7 +38,7 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
       textStartY = Math.max(textStartY, height + 15);
     }
   } catch (e) {
-    console.log('No logo found at /logo.png');
+    console.log('No logo found');
   }
 
   if (isQuotation) {
@@ -45,7 +50,7 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
     doc.setFontSize(9);
     doc.setTextColor(80, 80, 80);
     doc.setFont('', 'normal');
-    doc.text('Address: 15 Unit Plumtree Road, Bulawayo', pageWidth - 14, 28, { align: 'right' });
+    doc.text('Address: 15 Unit Plumtree Road', pageWidth - 14, 28, { align: 'right' });
     doc.text('Contact: 0712290046', pageWidth - 14, 33, { align: 'right' });
     doc.text('Email: sales@mineazy.co.zw', pageWidth - 14, 38, { align: 'right' });
     textStartY = Math.max(textStartY, 45);
@@ -170,6 +175,8 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
 
 
   const isQR = requisition.type === 'Shop QR' || requisition.type === 'Warehouse QR';
+  const hasCodeColumn = requisition.type === 'Warehouse' || requisition.type === 'Shop Use' || isQR || requisition.type === 'Quotations';
+  const hasPricingColumns = !isQR && requisition.type !== 'Fuel';
   const isFuel = requisition.type === 'Fuel';
   const currency = requisition.currency || 'USD';
   const symbol = currency === 'USD' ? '$' : '';
@@ -192,14 +199,24 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   autoTable(doc, {
     startY: tableStartY,
     head: [
-      isQR 
-        ? ['Code', 'Description', 'Quantity'] 
-        : isFuel 
-          ? ['Description', 'Litres', 'Type'] 
-          : ['Description', 'Quantity', 'Unit Cost', 'Total Cost']
+      hasCodeColumn && hasPricingColumns
+        ? ['Code', 'Description', 'Quantity', 'Rate', 'Total']
+        : isQR 
+          ? ['Code', 'Description', 'Quantity'] 
+          : isFuel 
+            ? ['Description', 'Litres', 'Type'] 
+            : ['Description', 'Quantity', 'Unit Cost', 'Total Cost']
     ],
     body: requisition.items.map(item => {
-      if (isQR) {
+      if (hasCodeColumn && hasPricingColumns) {
+        return [
+          item.code || '-',
+          item.description,
+          item.qty,
+          `${symbol}${item.unitCost.toFixed(2)}${suffix}`,
+          `${symbol}${item.totalCost.toFixed(2)}${suffix}`
+        ];
+      } else if (isQR) {
         return [item.code || 'N/A', item.description, item.qty];
       } else if (isFuel) {
         return [item.description, `${item.qty} L`, item.fuelType || 'Diesel'];
@@ -214,7 +231,13 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
     }),
     theme: 'striped',
     headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255], fontStyle: 'bold' },
-    foot: (isQR || isFuel) ? undefined : [['', '', 'TOTAL AMOUNT', `${symbol}${requisition.totalAmount.toFixed(2)}${suffix}`]],
+    foot: !hasPricingColumns ? undefined : [[
+      '', 
+      '', 
+      hasCodeColumn ? '' : undefined, 
+      'TOTAL AMOUNT', 
+      `${symbol}${requisition.totalAmount.toFixed(2)}${suffix}`
+    ].filter(v => v !== undefined)],
     footStyles: { fillColor: [245, 245, 245], textColor: [26, 26, 26], fontStyle: 'bold' },
     styles: { fontSize: 9, cellPadding: 4 },
   });

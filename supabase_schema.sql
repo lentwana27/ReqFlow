@@ -62,7 +62,15 @@ CREATE TABLE IF NOT EXISTS public.activity_logs (
   "department" TEXT -- Added
 );
 
--- 4. Password Recovery Tokens (For manual recovery link flow)
+-- 4. Settings Table
+CREATE TABLE IF NOT EXISTS public.settings (
+  "key" TEXT PRIMARY KEY,
+  "value" JSONB NOT NULL,
+  "updatedAt" TIMESTAMPTZ DEFAULT NOW(),
+  "updatedBy" TEXT
+);
+
+-- 5. Password Recovery Tokens (For manual recovery link flow)
 CREATE TABLE IF NOT EXISTS public.recovery_tokens (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "email" TEXT NOT NULL,
@@ -75,6 +83,7 @@ CREATE TABLE IF NOT EXISTS public.recovery_tokens (
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.requisitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 
 -- Profiles Policies
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.profiles;
@@ -143,3 +152,14 @@ CREATE POLICY "Public can insert help requests and auth events." ON public.activ
 DROP POLICY IF EXISTS "Authenticated users can view logs." ON public.activity_logs;
 CREATE POLICY "Authenticated users can view logs." ON public.activity_logs
   FOR SELECT USING (auth.role() = 'authenticated');
+
+-- Settings Policies
+DROP POLICY IF EXISTS "Settings are viewable by everyone." ON public.settings;
+CREATE POLICY "Settings are viewable by everyone." ON public.settings
+  FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Admins can update settings." ON public.settings;
+CREATE POLICY "Admins can update settings." ON public.settings
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin'))
+  );

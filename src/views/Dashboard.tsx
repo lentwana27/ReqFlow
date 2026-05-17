@@ -488,8 +488,8 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                 // For QR types, we show the first item's details in the table if filtered
                 const firstItem = req.items[0] || { code: '-', description: '-', qty: 0 };
 
-                // Extra check for Treasurer to see only Approved items in the list even if somehow they passed through filteredRequisitions
-                if (userProfile.role === UserRole.TREASURER && req.status !== 'approved' && req.status !== 'processed') {
+                // Extra check for Treasurer to see only Approved items in the list unless they are the creator
+                if (userProfile.role === UserRole.TREASURER && req.creatorId !== userProfile.uid && req.status !== 'approved' && req.status !== 'processed') {
                   return null;
                 }
 
@@ -583,7 +583,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                               : 'text-gray-400 border-transparent hover:text-black hover:border-gray-200'
                           }`}
                         >
-                          {needsMyAction ? 'Review' : 'View'}
+                          {(req.status === 'approved' || req.status === 'processed') ? 'Approved' : needsMyAction ? 'Review' : 'View'}
                         </button>
                       </div>
                     </td>
@@ -664,8 +664,8 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                     isAllowed = userProfile.department === Department.IT;
                     restrictionMsg = 'IT Dept Only';
                   } else if (t === RequisitionType.FINANCE) {
-                    isAllowed = userProfile.department === Department.FINANCE;
-                    restrictionMsg = 'Finance Dept Only';
+                    isAllowed = userProfile.department === Department.FINANCE || userProfile.department === Department.ADMINISTRATION;
+                    restrictionMsg = 'Finance/Admin Only';
                   }
 
                   return (

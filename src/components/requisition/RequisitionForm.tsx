@@ -26,6 +26,8 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
 
   const isWrittenToRequired = type !== RequisitionType.SHOP_USE && type !== RequisitionType.WAREHOUSE;
   const isQuotation = type === RequisitionType.QUOTATIONS;
+  const hasCodeColumn = type === RequisitionType.WAREHOUSE || type === RequisitionType.SHOP_USE || type === RequisitionType.SHOP_QR || type === RequisitionType.WAREHOUSE_QR || type === RequisitionType.QUOTATIONS;
+  const hasPricingColumns = type !== RequisitionType.SHOP_QR && type !== RequisitionType.WAREHOUSE_QR && type !== RequisitionType.FUEL;
 
   React.useEffect(() => {
     if (!isWrittenToRequired) {
@@ -109,6 +111,11 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
       return;
     }
 
+    if (isQuotation && !customerNumber.trim()) {
+      alert('The "CUSTOMER NUMBER" field is required for quotations.');
+      return;
+    }
+
     if (items.some(item => !item.description || item.qty <= 0)) {
       alert('Please fill in all item descriptions and quantities.');
       return;
@@ -122,7 +129,12 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
     
     // Final validation
     if (isWrittenToRequired && !writtenTo.trim()) {
-      alert('The "WRITE TO" field is required.');
+      alert('The "CUSTOMER NAME" / "WRITE TO" field is required.');
+      return;
+    }
+
+    if (isQuotation && !customerNumber.trim()) {
+      alert('The "CUSTOMER NUMBER" field is required for quotations.');
       return;
     }
 
@@ -345,12 +357,13 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                   </div>
                   {isQuotation && (
                     <div className="space-y-4">
-                      <label className="input-label font-bold">CUSTOMER NUMBER</label>
+                      <label className="input-label font-bold">CUSTOMER NUMBER <span className="text-red-500">*</span></label>
                       <input 
                         placeholder="e.g. CUST-001"
-                        className="w-full px-4 py-3 rounded-sm border border-gray-200 focus:border-black focus:ring-0 text-sm transition-all bg-gray-50/30 font-bold uppercase"
+                        className="w-full px-4 py-3 rounded-sm border border-gray-200 focus:border-black focus:ring-0 text-sm transition-all bg-gray-50/30 font-bold uppercase transition-all duration-200 focus:bg-white"
                         value={customerNumber}
                         onChange={(e) => setCustomerNumber(e.target.value.toUpperCase())}
+                        required
                       />
                     </div>
                   )}
@@ -371,35 +384,44 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                 
                 <div className="space-y-2">
                   <div className="grid grid-cols-12 gap-4 data-grid-header px-4">
-                    {(type === RequisitionType.SHOP_QR || type === RequisitionType.WAREHOUSE_QR) ? (
+                    {hasCodeColumn && hasPricingColumns ? (
+                      <>
+                        <div className="col-span-2">Code</div>
+                        <div className="col-span-5">Description</div>
+                        <div className="col-span-1 text-center">Qty</div>
+                        <div className="col-span-2 text-right">Price</div>
+                        <div className="col-span-2 text-right">Total</div>
+                      </>
+                    ) : (type === RequisitionType.SHOP_QR || type === RequisitionType.WAREHOUSE_QR) ? (
                       <>
                         <div className="col-span-3">Code</div>
                         <div className="col-span-7">Description</div>
-                        <div className="col-span-2">Qty</div>
+                        <div className="col-span-2 text-center">Qty</div>
                       </>
                     ) : type === RequisitionType.FUEL ? (
                       <>
                         <div className="col-span-6">Description</div>
-                        <div className="col-span-3">Litres</div>
-                        <div className="col-span-3">Type</div>
+                        <div className="col-span-3 text-center">Litres</div>
+                        <div className="col-span-3 text-right">Type</div>
                       </>
                     ) : (
                       <>
                         <div className="col-span-6">Description</div>
-                        <div className="col-span-2">Qty</div>
-                        <div className="col-span-2">Unit Cost</div>
+                        <div className="col-span-2 text-center">Qty</div>
+                        <div className="col-span-2 text-right">Unit Cost</div>
                         <div className="col-span-2 text-right">Total</div>
                       </>
                     )}
                   </div>
 
                   {items.map((item, idx) => {
-                    const isQR = type === RequisitionType.SHOP_QR || type === RequisitionType.WAREHOUSE_QR;
                     const isFuel = type === RequisitionType.FUEL;
+                    const isQROnly = (type === RequisitionType.SHOP_QR || type === RequisitionType.WAREHOUSE_QR);
+                    
                     return (
                       <div key={idx} className="grid grid-cols-12 gap-4 items-center px-4 py-3 bg-white border border-gray-100 hover:border-black transition-colors rounded-sm group relative">
-                        {isQR && (
-                          <div className="col-span-3">
+                        {hasCodeColumn && (
+                          <div className={hasPricingColumns ? "col-span-2" : "col-span-3"}>
                             <input 
                               placeholder="CODE"
                               className="w-full bg-transparent text-sm focus:outline-none uppercase font-mono"
@@ -408,7 +430,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                             />
                           </div>
                         )}
-                        <div className={isQR ? "col-span-7" : isFuel ? "col-span-6" : "col-span-6"}>
+                        <div className={hasCodeColumn && hasPricingColumns ? "col-span-5" : isQROnly ? "col-span-7" : isFuel ? "col-span-6" : "col-span-6"}>
                           <input 
                             placeholder={isFuel ? "e.g. For Generator" : "e.g. Printer Paper A4"}
                             className="w-full bg-transparent text-sm focus:outline-none"
@@ -416,12 +438,12 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                             onChange={(e) => updateItem(idx, 'description', e.target.value)}
                           />
                         </div>
-                        <div className={isFuel ? "col-span-3" : "col-span-2"}>
-                          <div className="flex items-center gap-1">
+                        <div className={hasCodeColumn && hasPricingColumns ? "col-span-1" : isFuel ? "col-span-3" : "col-span-2"}>
+                          <div className="flex items-center gap-1 justify-center">
                             <input 
                               type="number"
                               step="any"
-                              className="w-full bg-transparent text-sm focus:outline-none"
+                              className="w-full bg-transparent text-sm focus:outline-none text-center"
                               value={item.qty}
                               onChange={(e) => updateItem(idx, 'qty', parseFloat(e.target.value) || 0)}
                             />
@@ -431,7 +453,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                         {isFuel && (
                           <div className="col-span-3">
                             <select 
-                              className="w-full bg-transparent text-sm focus:outline-none font-bold"
+                              className="w-full bg-transparent text-sm focus:outline-none font-bold text-right"
                               value={item.fuelType || 'Diesel'}
                               onChange={(e) => updateItem(idx, 'fuelType', e.target.value)}
                             >
@@ -440,18 +462,18 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                             </select>
                           </div>
                         )}
-                        {!isQR && !isFuel && (
+                        {hasPricingColumns && (
                           <>
                             <div className="col-span-2">
                               <input 
                                 type="number"
                                 step="any"
-                                className="w-full bg-transparent text-sm focus:outline-none"
+                                className="w-full bg-transparent text-sm focus:outline-none text-right"
                                 value={item.unitCost}
                                 onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
                               />
                             </div>
-                            <div className="col-span-2 flex items-center justify-end gap-3 pr-6">
+                            <div className="col-span-2 flex items-center justify-end gap-3">
                               <span className="text-sm font-mono font-medium">${item.totalCost.toFixed(2)}</span>
                             </div>
                           </>
@@ -578,8 +600,8 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                         isAllowed = userDept === Department.IT;
                         restrictionMsg = 'IT Dept Only';
                       } else if (t === RequisitionType.FINANCE) {
-                        isAllowed = userDept === Department.FINANCE;
-                        restrictionMsg = 'Finance Dept Only';
+                        isAllowed = userDept === Department.FINANCE || userDept === Department.ADMINISTRATION;
+                        restrictionMsg = 'Finance/Admin Only';
                       }
                       
                       return (

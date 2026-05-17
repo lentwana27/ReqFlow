@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import { UserProfile, UserRole, Department, Requisition, ActivityLog, RequisitionType } from '../types';
 import { localDb } from './localDb';
 import { getPublicOrigin } from '../lib/urls';
+import { brandingService as firebaseBranding } from '../lib/firebase';
 
 // --- INITIALIZATION ---
 
@@ -1112,24 +1113,56 @@ export const customAuthService = {
 };
 
 export const brandingService = {
+  getLogo: async (): Promise<string | null> => {
+    try {
+      // 1. Try Supabase
+      const { data } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'branding')
+        .maybeSingle();
+      
+      if (data?.value?.logo) return data.value.logo;
+
+      // 2. Fallback to Firestore (for redundancy)
+      return await firebaseBranding.getLogo();
+    } catch (err) {
+      console.warn('[Branding] Failed to fetch logo from either source:', err);
+      return null;
+    }
+  },
   uploadLogo: async (base64Data: string) => {
     try {
-      const response = await fetch('/api/upload-logo', {
+      // 1. Save to Supabase for persistence
+      const { error } = await supabase
+        .from('settings')
+        .upsert({ 
+          key: 'branding', 
+          value: { logo: base64Data },
+          updatedAt: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+
+      // 2. Also save to Firestore (requested for "final app" persistence)
+      try {
+        await firebaseBranding.saveLogo(base64Data);
+      } catch (fErr) {
+        console.warn('Firestore branding update failed:', fErr);
+        // We don't throw here to avoid blocking if only Supabase works,
+        // but we want to know if it fails.
+      }
+      
+      // 3. Also try to update local session for immediate preview
+      await fetch('/api/upload-logo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ logoData: base64Data })
-      });
+      }).catch(e => console.warn('Local logo update failed (expected if server restarted):', e));
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to upload logo');
-      }
-      
-      return response.json();
+      return { success: true };
     } catch (err: any) {
-      if (err.message === 'Failed to fetch') {
-        throw new Error('Connection to server failed. Please check if the backend is running.');
-      }
+      console.error('[Branding] Failed to save logo:', err);
       throw err;
     }
   }
