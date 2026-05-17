@@ -47,6 +47,8 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
     if (isAdminUser(userProfile)) setIsLocked(false);
   }, [userProfile]);
 
+  const [systemStatus, setSystemStatus] = useState<any>(null);
+
   // ─── Data Fetching ───────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async (tab?: string) => {
@@ -62,6 +64,9 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
       } else if (targetTab === 'audit') {
         const localLogs = await auditService.list();
         setAuditLogs(localLogs);
+        
+        // Fetch system status when on logs tab as a health check
+        fetch('/api/system/status').then(res => res.json()).then(setSystemStatus).catch(console.warn);
       } else if (targetTab === 'branding') {
         const logo = await brandingService.getLogo();
         setCurrentLogo(logo);
@@ -902,6 +907,28 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
         ) : (
           // ─── Audit & Resets Tab ──────────────────────────────────────────────
           <motion.div key="audit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0}} className="space-y-4">
+            {/* System Service Health */}
+            {systemStatus && (
+              <div className="bg-white border border-gray-100 rounded-sm p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-full ${systemStatus.email.configured ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                    <AlertCircle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-black text-gray-400">Email Notification Service</p>
+                    <p className="text-sm font-bold flex items-center gap-2">
+                      {systemStatus.email.status}
+                      {systemStatus.email.isSandbox && <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded">Sandbox Mode</span>}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-[11px] text-gray-500 max-w-md italic text-right">
+                  {systemStatus.email.configured 
+                    ? `Active using Resend. Emails from: ${systemStatus.email.from}`
+                    : `RESEND_API_KEY is missing. Emails are currently being simulated only.`}
+                </div>
+              </div>
+            )}
             {/* Password Reset Requests — prominently shown at top */}
             {resetRequests.length > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-sm overflow-hidden">

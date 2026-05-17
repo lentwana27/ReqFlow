@@ -41,6 +41,26 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'MINEAZY REQFLOW', environment: process.env.NODE_ENV || 'development' });
 });
 
+// System Status for Admin
+app.get('/api/system/status', (req, res) => {
+  const hasResend = !!process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.length > 20;
+  const hasSupabaseServiceRole = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const fromEmail = process.env.VERIFIED_FROM_EMAIL || 'onboarding@resend.dev';
+  
+  res.json({
+    email: {
+      status: hasResend ? 'Active' : 'Simulation Mode',
+      configured: hasResend,
+      from: fromEmail,
+      isSandbox: fromEmail === 'onboarding@resend.dev'
+    },
+    auth: {
+      adminResets: hasSupabaseServiceRole ? 'Enabled' : 'Disabled',
+      configured: hasSupabaseServiceRole
+    }
+  });
+});
+
 // Admin Password Reset
 app.post('/api/admin/reset-password', async (req, res) => {
   const { userId, newPassword } = req.body;

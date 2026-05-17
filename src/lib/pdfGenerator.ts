@@ -59,6 +59,8 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
     doc.setTextColor(100, 100, 100);
     doc.setFont('', 'bold');
     doc.text('INTERNAL REQUISITION', pageWidth - 14, 20, { align: 'right' });
+    doc.setFontSize(10);
+    doc.text(`Type: ${requisition.type.toUpperCase()}`, pageWidth - 14, 26, { align: 'right' });
     textStartY = Math.max(textStartY, 35);
   }
 
@@ -107,9 +109,9 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
     doc.text(requisition.requisitionNumber, 55, textStartY + 10);
 
     doc.setFont('', 'bold');
-    doc.text('Sequence Number:', 14, textStartY + 17);
+    doc.text('Requisition Type:', 14, textStartY + 17);
     doc.setFont('', 'normal');
-    doc.text(requisition.sequenceNumber || 'N/A', 55, textStartY + 17);
+    doc.text(requisition.type || 'N/A', 55, textStartY + 17);
 
     doc.setFont('', 'bold');
     doc.text('Department:', 14, textStartY + 24);
@@ -121,10 +123,14 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
     doc.setFont('', 'normal');
     doc.text(requisition.creatorName, 55, textStartY + 31);
 
-    doc.setFont('', 'bold');
-    doc.text('Written To:', 14, textStartY + 38);
-    doc.setFont('', 'normal');
-    doc.text(requisition.writtenTo || 'N/A', 55, textStartY + 38);
+    const isInternalInternal = requisition.type === 'Warehouse' || requisition.type === 'Shop Use' || requisition.type === 'Shop QR' || requisition.type === 'Warehouse QR';
+
+    if (!isInternalInternal) {
+      doc.setFont('', 'bold');
+      doc.text('Written To:', 14, textStartY + 38);
+      doc.setFont('', 'normal');
+      doc.text(requisition.writtenTo || 'N/A', 55, textStartY + 38);
+    }
 
     doc.setFont('', 'bold');
     doc.text('Date Created:', pageWidth - 80, textStartY + 10);
@@ -200,7 +206,7 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
     startY: tableStartY,
     head: [
       hasCodeColumn && hasPricingColumns
-        ? ['Code', 'Description', 'Quantity', 'Rate', 'Total']
+        ? ['Code', 'Description', 'Quantity', 'Price', 'Total']
         : isQR 
           ? ['Code', 'Description', 'Quantity'] 
           : isFuel 

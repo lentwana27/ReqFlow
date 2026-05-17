@@ -24,7 +24,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
     initialData?.items || [{ description: '', qty: 1, unitCost: 0, totalCost: 0 }]
   );
 
-  const isWrittenToRequired = type !== RequisitionType.SHOP_USE && type !== RequisitionType.WAREHOUSE;
+  const isWrittenToRequired = type !== RequisitionType.SHOP_USE && type !== RequisitionType.WAREHOUSE && type !== RequisitionType.SHOP_QR && type !== RequisitionType.WAREHOUSE_QR;
   const isQuotation = type === RequisitionType.QUOTATIONS;
   const hasCodeColumn = type === RequisitionType.WAREHOUSE || type === RequisitionType.SHOP_USE || type === RequisitionType.SHOP_QR || type === RequisitionType.WAREHOUSE_QR || type === RequisitionType.QUOTATIONS;
   const hasPricingColumns = type !== RequisitionType.SHOP_QR && type !== RequisitionType.WAREHOUSE_QR && type !== RequisitionType.FUEL;
@@ -281,7 +281,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                           </>
                         ) : (
                           <>
-                            <td className="px-4 py-3 text-center">{item.qty}Units</td>
+                            <td className="px-4 py-3 text-center">{item.qty} Units</td>
                             <td className="px-4 py-3 text-right">{currency === Currency.USD ? '$' : ''}{item.unitCost.toFixed(2)}</td>
                             <td className="px-4 py-3 text-right font-bold">{currency === Currency.USD ? '$' : ''}{item.totalCost.toFixed(2)}</td>
                           </>
@@ -408,7 +408,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                       <>
                         <div className="col-span-6">Description</div>
                         <div className="col-span-2 text-center">Qty</div>
-                        <div className="col-span-2 text-right">Unit Cost</div>
+                        <div className="col-span-2 text-right">Price</div>
                         <div className="col-span-2 text-right">Total</div>
                       </>
                     )}

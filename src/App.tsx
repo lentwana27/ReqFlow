@@ -163,7 +163,7 @@ function AppContent() {
         onClose={() => setIsSettingsOpen(false)}
         userName={userProfile.username}
       />
-      <main className="p-8 max-w-7xl mx-auto">
+      <main className="p-4 sm:p-8 max-w-7xl mx-auto">
         <AnimatePresence mode="wait">
           {currentView === 'dashboard' ? (
             <motion.div

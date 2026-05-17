@@ -762,6 +762,11 @@ MINEAZY REQFLOW System
 
   async notifyNextApprover(requisition: Requisition) {
     try {
+      // Quotations do not notify anyone
+      if (requisition.type === RequisitionType.QUOTATIONS) {
+        return;
+      }
+
       const currentStage = requisition.currentStage;
       const approvals = requisition.approvals;
       
@@ -1134,23 +1139,33 @@ export const brandingService = {
   uploadLogo: async (base64Data: string) => {
     try {
       // 1. Save to Supabase for persistence
-      const { error } = await supabase
-        .from('settings')
-        .upsert({ 
-          key: 'branding', 
-          value: { logo: base64Data },
-          updatedAt: new Date().toISOString()
-        });
-      
-      if (error) throw error;
+      try {
+        const { error } = await supabase
+          .from('settings')
+          .upsert({ 
+            key: 'branding', 
+            value: { logo: base64Data },
+            updatedAt: new Date().toISOString()
+          });
+        
+        if (error) {
+          if (error.code === 'PGRST205') {
+            // Settings table not found in Supabase. This is expected in some environments.
+            // We successfully fallback to Firestore below.
+          } else {
+            throw error;
+          }
+        }
+      } catch (sErr) {
+        console.warn('[Branding] Supabase save failed:', sErr);
+      }
 
       // 2. Also save to Firestore (requested for "final app" persistence)
       try {
         await firebaseBranding.saveLogo(base64Data);
       } catch (fErr) {
         console.warn('Firestore branding update failed:', fErr);
-        // We don't throw here to avoid blocking if only Supabase works,
-        // but we want to know if it fails.
+        // We don't throw here to avoid blocking if the rules are restrictive
       }
       
       // 3. Also try to update local session for immediate preview

@@ -74,8 +74,8 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
 
     const isCreator = requisition.creatorId === userProfile.uid;
     if (isCreator) {
-      // Requesters can delete only if stage is 0 and status is pending (Draft/Incomplete)
-      return requisition.currentStage === 0 && requisition.status === 'pending';
+      // Requesters can delete if not yet completed (approved) or money given (processed)
+      return requisition.status === 'pending' || requisition.status === 'rejected';
     }
 
     // Approvers can delete if it is at their stage and NOT reached Director
@@ -338,19 +338,18 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
         newStatus === 'rejected' 
           ? `Requisition ${requisition.requisitionNumber} rejected.` 
           : newStatus === 'processed'
-            ? `Requisition ${requisition.requisitionNumber} issued by Treasurer.`
-            : `Stage ${requisition.currentStage + 1} approved/completed by Director.`,
+            ? `Issued by ${userProfile.name}`
+            : `Approved by ${userProfile.name}`,
         newStatus === 'rejected' ? 'error' : 'success'
       );
 
       setIsSuccess(true);
       setIsProcessing(null);
 
-      setTimeout(() => {
-        onClose();
-        setComment('');
-        setIsSuccess(false);
-      }, 500);
+      // straight away exit that requisition per user request
+      onClose();
+      setComment('');
+      setIsSuccess(false);
     } catch (error: any) {
       console.error('Update status error:', error);
       setIsProcessing(null);
@@ -403,7 +402,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col border-l border-gray-200"
+        className="bg-white w-full sm:max-w-2xl h-full shadow-2xl flex flex-col border-l border-gray-200"
       >
         <div className="p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
           <div className="flex items-center gap-3">
@@ -446,7 +445,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-12">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-12">
           {requisition.status === 'rejected' && requisition.rejectionReason && (
             <motion.div 
               initial={{ opacity: 0, y: -20 }}
@@ -469,7 +468,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                 <p className="text-sm font-bold uppercase">{requisition.creatorName}</p>
                 <p className="text-xs text-gray-500 font-mono italic">{requisition.department}</p>
               </div>
-              {requisition.type !== RequisitionType.SHOP_USE && requisition.type !== RequisitionType.WAREHOUSE && (
+              {requisition.type !== RequisitionType.SHOP_USE && requisition.type !== RequisitionType.WAREHOUSE && requisition.type !== RequisitionType.SHOP_QR && requisition.type !== RequisitionType.WAREHOUSE_QR && (
                 <div>
                   <label className="input-label">Written To</label>
                   <p className="text-sm font-semibold text-blue-900">{requisition.writtenTo || 'N/A'}</p>
@@ -477,8 +476,12 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
               )}
               {requisition.amountIssued !== undefined && requisition.amountIssued !== null && (
                 <div className="bg-green-50 p-2 border border-green-100 rounded-sm">
-                  <label className="text-[9px] uppercase font-bold text-green-600 block">Amount Issued</label>
-                  <p className="text-sm font-bold text-green-800">{symbol}{requisition.amountIssued.toFixed(2)}{suffix}</p>
+                  <label className="text-[9px] uppercase font-bold text-green-600 block">
+                    {requisition.type === RequisitionType.FUEL ? 'Fuel Issued (Litres)' : 'Amount Issued'}
+                  </label>
+                  <p className="text-sm font-bold text-green-800">
+                    {requisition.type === RequisitionType.FUEL ? `${requisition.amountIssued} L` : `${symbol}${requisition.amountIssued.toFixed(2)}${suffix}`}
+                  </p>
                 </div>
               )}
               {requisition.changeReturned !== undefined && requisition.changeReturned > 0 && (
@@ -493,7 +496,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                     Funds Return {requisition.returnStatus === 'confirmed' ? '(CONFIRMED)' : '(PENDING)'}
                   </label>
                   <p className={`text-sm font-bold ${requisition.returnStatus === 'confirmed' ? 'text-green-800' : 'text-blue-800'}`}>
-                    {symbol}{requisition.amountToReturn?.toFixed(2)}{suffix}
+                    {requisition.type === RequisitionType.FUEL ? `${requisition.amountToReturn} L` : `${symbol}${requisition.amountToReturn?.toFixed(2)}${suffix}`}
                   </p>
                 </div>
               )}
@@ -544,7 +547,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                         {isFuel && <th className="text-right px-4 py-3">Type</th>}
                         {hasPricingColumns && (
                           <>
-                            <th className="text-right px-4 py-3">Rate</th>
+                            <th className="text-right px-4 py-3">Price</th>
                             <th className="text-right px-4 py-3">Total</th>
                           </>
                         )}
@@ -687,7 +690,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
                         {approval.status === 'pending' ? 'Waiting for approval' : 
-                         approval.status === 'approved' ? (approval.role.includes('Director') ? `Approved by ${approval.approverName}` : 'Approved') : approval.status}
+                         approval.status === 'approved' ? `Approved by ${approval.approverName || 'N/A'}` : approval.status}
                       </p>
                       {approval.comment && (
                         <p className="text-xs italic text-gray-400 mt-2 bg-white p-2 border border-gray-100 rounded-sm">
@@ -788,9 +791,17 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                   ) : (
                     <Check className="w-4 h-4" />
                   )}
-                  {isProcessing === 'approved' ? 'Processing...' : isSuccess ? 'Approved!' : `Approve Stage ${requisition.currentStage + 1}`}
+                  {isProcessing === 'approved' ? 'Processing...' : isSuccess ? 'Approved!' : 'Approve Request'}
                 </button>
               </div>
+              {requisition.currentStage > 0 && requisition.approvals[requisition.currentStage - 1] && (
+                <div className="p-3 bg-gray-50 border border-gray-100 rounded-sm flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                    Previously Approved by {requisition.approvals[requisition.currentStage - 1].approverName || 'Authorized User'}
+                  </p>
+                </div>
+              )}
             </div>
           ) : !userProfile.isVerified && userProfile.username !== 'admin' && checkRoleMatch(userProfile, requisition.approvals[requisition.currentStage]?.role || '', requisition.department) ? (
              <div className="p-6 bg-amber-50 border border-amber-200 rounded-sm flex flex-col items-center text-center gap-3">

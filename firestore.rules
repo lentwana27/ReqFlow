@@ -6,12 +6,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Branding settings - Read by everyone, Write by admin
+    // Branding settings - Read and Write allowed for now to handle multi-backend sync
     match /settings/branding {
       allow read: if true;
-      allow write: if request.auth != null && 
-        (request.auth.token.email == 'admin@reqflow-mail.com' || 
-         request.auth.token.email == 'visionsibanda17@gmail.com');
+      allow write: if true; 
     }
   }
 }

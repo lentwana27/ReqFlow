@@ -328,21 +328,21 @@ export default function Dashboard({ userProfile }: DashboardProps) {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-bold tracking-tighter">Inventory & Requisitions</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tighter">Inventory & Requisitions</h2>
           <p className="text-gray-500 text-sm mt-1">Manage and track your digital requisition workflow.</p>
         </div>
         <button 
           id="new-req-btn"
           onClick={() => setShowTypeSelector(true)}
-          className="btn-primary flex items-center gap-2 h-12 px-6"
+          className="w-full sm:w-auto btn-primary flex items-center gap-2 h-12 px-6 justify-center"
         >
           <Plus className="w-4 h-4" /> Write Requisition
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, idx) => (
           <div key={idx} className={`card flex items-center justify-between ${idx === 0 && stat.count > 0 ? 'ring-2 ring-amber-400 bg-amber-50/30' : ''}`}>
             <div>
@@ -524,11 +524,17 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                             <span className="text-[10px] text-gray-400 font-mono italic">{req.department}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 font-mono text-xs font-bold text-right">
+                    <td className="px-6 py-4 font-mono text-xs font-bold text-right">
+                      {req.type === RequisitionType.FUEL ? (
+                        <span className="text-blue-600">{req.items.reduce((sum, item) => sum + (item.qty || 0), 0)} L</span>
+                      ) : (
+                        <>
                           {req.currency === Currency.USD || !req.currency ? '$' : ''}
                           {req.totalAmount.toFixed(2)}
                           {req.currency && req.currency !== Currency.USD ? ` ${req.currency}` : ''}
-                        </td>
+                        </>
+                      )}
+                    </td>
                       </>
                     )}
 
@@ -583,7 +589,9 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                               : 'text-gray-400 border-transparent hover:text-black hover:border-gray-200'
                           }`}
                         >
-                          {(req.status === 'approved' || req.status === 'processed') ? 'Approved' : needsMyAction ? 'Review' : 'View'}
+                          {req.status === 'approved' ? 'Approved' : 
+                           req.status === 'processed' ? 'Issued' : 
+                           needsMyAction ? 'Review' : 'View'}
                         </button>
                       </div>
                     </td>
