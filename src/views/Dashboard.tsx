@@ -104,7 +104,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
     if (tab === 'ACTION') {
       const currentApproval = req.approvals[req.currentStage];
       const isApprover = req.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
-      const isProcessor = req.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD);
+      const isProcessor = req.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
       
       if (!isApprover && !isProcessor) {
         return false;
@@ -297,7 +297,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       count: requisitions.filter(r => {
         const currentApproval = r.approvals[r.currentStage];
         const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
-        const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD);
+        const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
         return isApprover || isProcessor;
       }).length, 
       icon: Clock, 
@@ -369,13 +369,13 @@ export default function Dashboard({ userProfile }: DashboardProps) {
             Action Items ({requisitions.filter(r => {
               const currentApproval = r.approvals[r.currentStage];
               const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
-              const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD);
+              const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
               return isApprover || isProcessor;
             }).length})
             {requisitions.some(r => {
               const currentApproval = r.approvals[r.currentStage];
               const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
-              const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD);
+              const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
               return isApprover || isProcessor;
             }) && <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />}
           </button>
@@ -482,7 +482,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
               {paginatedRequisitions.map((req) => {
                 const currentApproval = req.approvals[req.currentStage];
                 const isApprover = req.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
-                const isProcessor = req.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD);
+                const isProcessor = req.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
                 const needsMyAction = isApprover || isProcessor;
                 
                 // For QR types, we show the first item's details in the table if filtered

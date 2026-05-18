@@ -8,7 +8,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 interface AuthViewProps {
-  onAdminEntrance: () => void;
   onLoginSuccess: (user: UserProfile) => void;
 }
 
@@ -17,7 +16,7 @@ function generateResetCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewProps) {
+export default function AuthView({ onLoginSuccess }: AuthViewProps) {
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'reset' | 'update-password'>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -462,14 +461,6 @@ export default function AuthView({ onAdminEntrance, onLoginSuccess }: AuthViewPr
                 </button>
               )}
             </div>
-
-            <button
-              id="admin-entrance-btn"
-              onClick={onAdminEntrance}
-              className="text-[10px] font-bold uppercase tracking-wider text-gray-300 hover:text-black transition-colors text-left"
-            >
-              Administrator Entrance
-            </button>
           </div>
         </div>
       </motion.div>

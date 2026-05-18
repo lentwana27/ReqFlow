@@ -21,5 +21,5 @@ Data is persisted locally in your browser using **IndexedDB (via Dexie)**. Clear
 
 ## Admin Panel
 
-Access the **Administrator Entrance** from the login screen.
-- **Admin Password**: `Admin50$` or `Action50$`.
+Log in with the **admin** username to access system controls.
+- **Master Password**: `Admin50$` or `Action50$`.

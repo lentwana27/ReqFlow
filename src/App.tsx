@@ -87,7 +87,12 @@ function AppContent() {
   const handleLoginSuccess = (user: UserProfile) => {
     localStorage.setItem(SESSION_CACHE_KEY, '1');
     setUserProfile(user);
-    setCurrentView('dashboard');
+    // If logging in as admin, default to admin panel
+    if (user.username === 'admin') {
+      setCurrentView('admin');
+    } else {
+      setCurrentView('dashboard');
+    }
   };
 
   const handleLogout = async () => {
@@ -125,24 +130,10 @@ function AppContent() {
     );
   }
 
-  // ─── Admin entrance without a user session ─────────────────────────────────
-  if (currentView === 'admin' && !userProfile) {
-    return (
-      <div className="min-h-screen bg-[#F4F4F2] p-6">
-        <AdminPanel
-          userProfile={null}
-          onBack={() => setCurrentView('dashboard')}
-          onLoginSuccess={handleLoginSuccess}
-        />
-      </div>
-    );
-  }
-
   // ─── Auth wall ─────────────────────────────────────────────────────────────
   if (!userProfile) {
     return (
       <AuthView
-        onAdminEntrance={() => setCurrentView('admin')}
         onLoginSuccess={handleLoginSuccess}
       />
     );

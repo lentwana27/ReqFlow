@@ -69,8 +69,11 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
   }, [requisition.id, userProfile]);
 
   const canDelete = () => {
-    const isSystemAdmin = userProfile.username === 'admin' || userProfile.role === UserRole.ADMIN;
-    if (isSystemAdmin) return true;
+    // Only the general system administrator (username: 'admin') can force delete any requisition
+    if (userProfile.username === 'admin') return true;
+
+    // Audit System Administrators (ADMIN role) can view all requisitions but NOT delete them
+    if (userProfile.role === UserRole.ADMIN) return false;
 
     const isCreator = requisition.creatorId === userProfile.uid;
     if (isCreator) {
@@ -78,12 +81,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
       return requisition.status === 'pending' || requisition.status === 'rejected';
     }
 
-    // Approvers can delete if it is at their stage and NOT reached Director
-    const currentApproval = requisition.approvals[requisition.currentStage];
-    const isAtMyStage = currentApproval && currentApproval.role === userProfile.role;
-    const isNotDirectorStage = currentApproval && currentApproval.role !== UserRole.DIRECTOR;
-
-    return isAtMyStage && isNotDirectorStage;
+    return false;
   };
 
   const handleDelete = async () => {

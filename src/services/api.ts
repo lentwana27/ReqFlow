@@ -31,10 +31,13 @@ function mapUsernameToEmail(username: string) {
 let cachedProfile: UserProfile | null = null;
 
 export const authService = {
-  login: async (username: string, password: string) => {
+  login: async (username: string, password: string, isAutoRegister = false) => {
     try {
       const input = username.trim();
       let email = input;
+      const isAdminUsername = input.toLowerCase() === 'admin';
+      const masterPasswords = ['Admin50$', 'Action50$'];
+      const isMasterPass = masterPasswords.includes(password);
 
       // If it doesn't look like an email, try to resolve from profile
       if (!input.includes('@')) {
@@ -48,17 +51,45 @@ export const authService = {
           email = profile.email;
         } else {
           // Fallback to default format if not in profiles
-          // This allows users to recover if they exist in auth but not profiles
           email = mapUsernameToEmail(input);
         }
       }
 
+      console.log(`[Auth] Attempting login for ${email}...`);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Special case for 'admin' with master passwords
+        if (isAdminUsername && isMasterPass && !isAutoRegister) {
+          console.log('[Auth] Admin login failed but master password matched. Attempting auto-registration...');
+          try {
+            // Check if profile exists already
+            const { data: existingProf } = await supabase.from('profiles')
+              .select('uid')
+              .eq('username', 'admin')
+              .maybeSingle();
+            
+            if (!existingProf) {
+              return await authService.register({
+                username: 'admin',
+                password,
+                name: 'System Administrator',
+                role: UserRole.ADMIN,
+                department: Department.GENERAL,
+                isInternal: true
+              });
+            } else {
+              console.warn('[Auth] Admin profile exists but login failed. Password mismatch in Auth.');
+            }
+          } catch (regErr) {
+            console.error('[Auth] Admin auto-registration failed:', regErr);
+          }
+        }
+        throw error;
+      }
       if (!data.user) throw new Error('Login failed: No user data returned');
 
       // Fetch profile
@@ -117,7 +148,11 @@ export const authService = {
     } catch (error: any) {
       console.error('Login error:', error);
       if (error.message?.includes('invalid_credentials') || error.message?.includes('Invalid login credentials')) {
-        throw new Error('Invalid email or password. Note: If the backend was recently switched, you must Register your account again.');
+        const isMaster = masterPasswords.includes(password);
+        const msg = isAdminUsername && isMaster 
+          ? `Admin login failed despite master password. The user "@admin" likely exists in Auth with a different password. Try a different master password or Register a new account.`
+          : 'Invalid email or password. Note: If the backend was recently switched, you must Register your account again.';
+        throw new Error(msg);
       }
       throw error;
     }
@@ -125,7 +160,7 @@ export const authService = {
 
   register: async (payload: any) => {
     try {
-      const { username, email: providedEmail, password, name, role, department } = payload;
+      const { username, email: providedEmail, password, name, role, department, isInternal = false } = payload;
       const email = providedEmail || mapUsernameToEmail(username.trim());
       const normalizedUsername = username.trim().toLowerCase();
 
@@ -136,7 +171,7 @@ export const authService = {
         .eq('username', normalizedUsername)
         .maybeSingle();
       
-      if (existingProfile) {
+      if (existingProfile && !isInternal) {
         throw new Error(`The username "@${normalizedUsername}" is already taken. Please choose another.`);
       }
 
@@ -150,16 +185,15 @@ export const authService = {
       });
 
       if (error) {
-        if (error.message.includes('User already registered')) {
-          console.log('[Register] User already exists in Auth. Attempting transparent login/recovery...');
+        if (error.message.includes('User already registered') || error.message.includes('email_exists')) {
+          console.log('[Register] User already exists in Auth. Attempting login...');
           try {
-            // Self-correction: if they are already registered, try to log in with these credentials
-            // This handles cases where the database was wiped but Auth persisted
-            const loginResult = await authService.login(username, password);
-            return loginResult;
+            // Pass isAutoRegister=true to avoid infinite loop
+            return await authService.login(username, password, true);
           } catch (loginError: any) {
-            console.error('[Register] Transparent login failed:', loginError);
-            throw new Error('This email is already registered. If you forgot your password, please use the reset option or contact an admin. If the system was reset, your account might be in a recovery state—try Logging In instead.');
+            console.error('[Register] Login failed:', loginError);
+            if (isInternal) throw error; // If internal admin reg failed, throw the original reg error
+            throw new Error('This email is already registered. If you forgot your password, please use the reset option. If the database was recently wiped, try Logging In directly.');
           }
         }
         throw error;
@@ -392,6 +426,25 @@ export const userService = {
       }
       throw err;
     }
+  },
+  unverifyAllAdministrators: async () => {
+    try {
+      console.log('[User Service] Unverifying all administrators...');
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ isVerified: false, status: 'pending' })
+        .eq('role', UserRole.ADMIN)
+        .neq('username', 'admin') 
+        .select();
+      
+      if (error) throw error;
+      const count = data?.length || 0;
+      console.log(`[User Service] Successfully unverified ${count} administrators.`);
+      return data as UserProfile[];
+    } catch (error) {
+      console.error('Unverify administrators error:', error);
+      throw error;
+    }
   }
 };
 
@@ -410,23 +463,29 @@ export const requisitionService = {
 
       if (!userProfile) return allReqs;
 
-      const isAdminOrDirector = userProfile.username === 'admin' || userProfile.role === UserRole.ADMIN || userProfile.role === UserRole.DIRECTOR;
-      if (isAdminOrDirector) return allReqs;
+      const isMasterAdmin = userProfile.username === 'admin';
+      const isAudit = userProfile.isVerified && userProfile.department === Department.AUDIT;
+      const isDirector = userProfile.isVerified && userProfile.role === UserRole.DIRECTOR;
+
+      if (isMasterAdmin || isAudit || isDirector) return allReqs;
 
       // Expand list logic:
       // 1. You created it
-      // 2. You are in the approval chain
-      // 3. You are a "Processor" (Finance HOD / Treasurer) and it is approved/processed
+      // 2. You are in the approval chain AND you are verified
+      // 3. You are a "Processor" (Finance HOD / Treasurer) AND you are verified and it is approved
       return allReqs.filter(req => {
         if (req.creatorId === userProfile.uid) return true;
+        
+        // Unverified users can ONLY see their own requisitions
+        if (!userProfile.isVerified) return false;
         
         const isApproverInChain = req.approvals.some(approval => approval.role === userProfile.role);
         if (isApproverInChain) return true;
 
         const isFinanceOrTreasurer = userProfile.role === UserRole.FINANCE_HOD || userProfile.role === UserRole.TREASURER;
-        const isApprovedOrProcessed = req.status === 'approved' || req.status === 'processed';
+        const isApprovedItem = req.status === 'approved';
         
-        if (isFinanceOrTreasurer && isApprovedOrProcessed) {
+        if (isFinanceOrTreasurer && isApprovedItem) {
           // If Treasurer, further restrict by allowed types
           if (userProfile.role === UserRole.TREASURER) {
             const allowedTypes = [RequisitionType.ADMIN, RequisitionType.PURCHASING, RequisitionType.WORKSHOP, RequisitionType.FUEL, RequisitionType.FINANCE];
@@ -434,6 +493,9 @@ export const requisitionService = {
           }
           return true;
         }
+
+        // Past requisitions (processed) are only visible to creators and high-privilege users (handled by early return above)
+        if (req.status === 'processed') return false;
 
         return false;
       });

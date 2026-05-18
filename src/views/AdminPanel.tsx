@@ -4,7 +4,7 @@ import { UserProfile, UserRole, Department, ROLES, DEPARTMENTS } from '../types'
 import {
   Users, CheckCircle2, XCircle, Search, Loader2,
   Lock, ArrowLeft, AlertCircle, RefreshCw, KeyRound,
-  Download, Calendar, Filter, Image as ImageIcon, Upload
+  Download, Calendar, Filter, Image as ImageIcon, Upload, ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from '../context/ToastContext';
@@ -36,7 +36,7 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
   const [isSyncing, setIsSyncing] = useState(false);
 
   const isAdminUser = (u?: UserProfile | null) =>
-    !!u && (u.username === 'admin' || u.role === UserRole.ADMIN);
+    !!u && (u.username === 'admin' || (u.role === UserRole.ADMIN && u.isVerified));
 
   const [isLocked, setIsLocked] = useState(!isAdminUser(userProfile));
   const [password, setPassword] = useState('');
@@ -110,7 +110,7 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
     try {
       const { user } = await authService.login('admin', trimmed);
       setUnlockStatus('Syncing profile...');
-      if (onLoginSuccess) onLoginSuccess(user);
+      if (onLoginSuccess) onLoginSuccess(userProfile || user);
       setIsLocked(false); // Success! Unlock everything
       showToast('Admin access elevated');
     } catch (loginErr: any) {
@@ -449,6 +449,40 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
             </div>
           )}
 
+          {/* System Maintenance (Master Admin only) */}
+          {userProfile?.username === 'admin' && activeTab === 'users' && (
+            <button
+              onClick={async () => {
+                if (confirm('RESET SYSTEM ADMINISTRATORS: This will unverify ALL System Administrators (except yourself) and force them to wait for your approval. This cannot be undone. Proceed?')) {
+                  try {
+                    setIsSyncing(true);
+                    const resetUsers = await userService.unverifyAllAdministrators();
+                    const count = resetUsers.length;
+                    
+                    await auditService.log({
+                      action: 'RESET_ADMINS',
+                      module: 'USERS',
+                      details: `Master Admin reset and unverified ${count} system administrators.`
+                    });
+
+                    showToast(`${count} system administrator accounts have been unverified and set to pending.`);
+                    await fetchData('users');
+                  } catch (e: any) {
+                    console.error('[Admin] Reset error:', e);
+                    showToast(`Reset failed: ${e.message}`, 'error');
+                  } finally {
+                    setIsSyncing(false);
+                  }
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-2 text-xs font-bold bg-red-600 text-white border border-red-700 rounded-sm hover:bg-red-700 transition-colors shadow-sm"
+              title="Force all non-master admins to wait for re-approval"
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              Reset All Admins
+            </button>
+          )}
+
           <button
             onClick={handleSync}
             disabled={isSyncing}
@@ -460,7 +494,9 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
 
           {/* Tab switcher */}
           <div className="flex bg-white border border-gray-200 p-1 rounded-sm gap-1">
-            {(['users', 'requisitions', 'audit', 'branding'] as const).map((tab) => (
+            {(['users', 'requisitions', 'audit', 'branding'] as const)
+              .filter(tab => tab !== 'branding' || userProfile?.username === 'admin')
+              .map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -708,9 +744,13 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
                                     <XCircle className="w-4 h-4" />
                                   </button>
                                   <button
-                                    onClick={() =>
-                                      handleUpdateWithLoading(user.uid, { isVerified: true, status: 'approved' })
-                                    }
+                                    onClick={() => {
+                                      if (user.role === UserRole.DIRECTOR && userProfile?.username !== 'admin') {
+                                        showToast('Only the Master Administrator can verify Director accounts', 'error');
+                                        return;
+                                      }
+                                      handleUpdateWithLoading(user.uid, { isVerified: true, status: 'approved' });
+                                    }}
                                     disabled={isUpdating}
                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-black text-white text-xs font-bold rounded-sm hover:bg-gray-800 transition-colors disabled:opacity-50"
                                   >
@@ -803,22 +843,24 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={async () => {
-                            if (confirm('Delete this requisition permanently?')) {
-                              try {
-                                await requisitionService.delete(req.id, userProfile);
-                                setRequisitions((prev) => prev.filter((r) => r.id !== req.id));
-                                showToast('Requisition deleted');
-                              } catch (e: any) {
-                                showToast(`Delete failed: ${e.message}`);
+                        {userProfile?.username === 'admin' && (
+                          <button
+                            onClick={async () => {
+                              if (confirm('Delete this requisition permanently?')) {
+                                try {
+                                  await requisitionService.delete(req.id, userProfile);
+                                  setRequisitions((prev) => prev.filter((r) => r.id !== req.id));
+                                  showToast('Requisition deleted');
+                                } catch (e: any) {
+                                  showToast(`Delete failed: ${e.message}`);
+                                }
                               }
-                            }
-                          }}
-                          className="text-xs text-red-300 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 font-bold"
-                        >
-                          Force Delete
-                        </button>
+                            }}
+                            className="text-xs text-red-300 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 font-bold"
+                          >
+                            Force Delete
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
