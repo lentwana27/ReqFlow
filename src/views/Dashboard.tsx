@@ -47,7 +47,10 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           // Auto-switch to Action tab if there are items needing approval
           const needsApproval = localData.filter(r => {
             const currentApproval = r.approvals[r.currentStage];
-            return r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+            const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+            const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
+            const isTreasurerReturn = userProfile.role === UserRole.TREASURER && r.returnStatus === 'pending' && userProfile.isVerified;
+            return isApprover || isProcessor || isTreasurerReturn;
           });
           if (needsApproval.length > 0 && tab === 'ALL') {
             // Only auto-switch once? Or just leave it for now.
@@ -105,8 +108,9 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       const currentApproval = req.approvals[req.currentStage];
       const isApprover = req.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
       const isProcessor = req.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
+      const isTreasurerReturn = userProfile.role === UserRole.TREASURER && req.returnStatus === 'pending' && userProfile.isVerified;
       
-      if (!isApprover && !isProcessor) {
+      if (!isApprover && !isProcessor && !isTreasurerReturn) {
         return false;
       }
     } else if (tab === 'MY') {
@@ -298,7 +302,8 @@ export default function Dashboard({ userProfile }: DashboardProps) {
         const currentApproval = r.approvals[r.currentStage];
         const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
         const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
-        return isApprover || isProcessor;
+        const isTreasurerReturn = userProfile.role === UserRole.TREASURER && r.returnStatus === 'pending' && userProfile.isVerified;
+        return isApprover || isProcessor || isTreasurerReturn;
       }).length, 
       icon: Clock, 
       color: 'text-amber-600' 
@@ -370,13 +375,15 @@ export default function Dashboard({ userProfile }: DashboardProps) {
               const currentApproval = r.approvals[r.currentStage];
               const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
               const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
-              return isApprover || isProcessor;
+              const isTreasurerReturn = userProfile.role === UserRole.TREASURER && r.returnStatus === 'pending' && userProfile.isVerified;
+              return isApprover || isProcessor || isTreasurerReturn;
             }).length})
             {requisitions.some(r => {
               const currentApproval = r.approvals[r.currentStage];
               const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
               const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
-              return isApprover || isProcessor;
+              const isTreasurerReturn = userProfile.role === UserRole.TREASURER && r.returnStatus === 'pending' && userProfile.isVerified;
+              return isApprover || isProcessor || isTreasurerReturn;
             }) && <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />}
           </button>
           <button 
@@ -483,25 +490,31 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                 const currentApproval = req.approvals[req.currentStage];
                 const isApprover = req.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
                 const isProcessor = req.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
-                const needsMyAction = isApprover || isProcessor;
+                const isTreasurerReturn = userProfile.role === UserRole.TREASURER && req.returnStatus === 'pending' && userProfile.isVerified;
+                const needsMyAction = isApprover || isProcessor || isTreasurerReturn;
                 
                 // For QR types, we show the first item's details in the table if filtered
                 const firstItem = req.items[0] || { code: '-', description: '-', qty: 0 };
 
-                // Extra check for Treasurer to see only Approved items in the list unless they are the creator
-                if (userProfile.role === UserRole.TREASURER && req.creatorId !== userProfile.uid && req.status !== 'approved' && req.status !== 'processed') {
+                // Extra check for Treasurer to see only Approved items in the list unless they are the creator or it has pending return
+                if (userProfile.role === UserRole.TREASURER && req.creatorId !== userProfile.uid && req.status !== 'approved' && req.status !== 'processed' && req.returnStatus !== 'pending') {
                   return null;
                 }
+
+                const hasPendingChange = req.returnStatus === 'pending';
+                const hasChangeToSubmit = req.status === 'processed' && req.changeReturned && req.changeReturned > 0 && req.returnStatus === 'none' && req.creatorId === userProfile.uid;
 
                 return (
                   <tr 
                     key={req.id} 
-                    className={`data-row ${needsMyAction ? 'bg-amber-50/50 hover:bg-amber-100/50' : ''}`}
+                    className={`data-row ${needsMyAction ? 'bg-amber-50/50 hover:bg-amber-100/50' : hasPendingChange ? 'bg-blue-50/50 hover:bg-blue-100/50' : hasChangeToSubmit ? 'bg-indigo-50/50 hover:bg-indigo-100/50' : ''}`}
                     onClick={() => setSelectedReq(req)}
                   >
                     <td className="px-6 py-4 font-mono text-xs font-bold">
                       <div className="flex items-center gap-2">
                         {needsMyAction && <Clock className="w-3 h-3 text-amber-500" />}
+                        {hasPendingChange && <ArrowUpRight className="w-3 h-3 text-blue-500" />}
+                        {hasChangeToSubmit && <Clock className="w-3 h-3 text-indigo-500" />}
                         <div className="flex flex-col">
                           <span>{req.requisitionNumber}</span>
                           <span className="text-[10px] text-gray-400">#{req.sequenceNumber || '---'}</span>
@@ -556,6 +569,16 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                            req.status === 'processed' ? 'Issued' : 
                            req.status}
                         </span>
+                        {req.returnStatus === 'pending' && (
+                          <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1 border border-blue-100 rounded-sm">
+                            Return Pending
+                          </span>
+                        )}
+                        {req.returnStatus === 'confirmed' && (
+                          <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1 border border-indigo-100 rounded-sm">
+                            Funds Returned
+                          </span>
+                        )}
                         {req.processedNumber && (
                           <span className="text-[9px] font-mono font-bold text-green-700 bg-green-50 px-1 border border-green-100 rounded-sm">
                             {req.processedNumber}

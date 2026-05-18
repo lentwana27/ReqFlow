@@ -1,18 +1,26 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format, parseISO } from 'date-fns';
-import { Requisition} from '../types';
+import { Requisition, UserRole, RequisitionType } from '../types';
 import QRCode from 'qrcode';
 import { getPublicOrigin } from './urls';
 import { brandingService } from '../services/api';
 
-export const generateRequisitionPDF = async (requisition: Requisition) => {
+export const generateRequisitionPDF = async (requisition: Requisition, userRole?: string) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
+  const pageHeight = doc.internal.pageSize.height;
 
   const headerY = 20;
   let textStartY = 15;
   const isQuotation = requisition.type === 'Quotations';
+  const isTreasurer = userRole === UserRole.TREASURER;
+  
+  // Internal types that should be partially hidden for the Treasurer
+  const isInternalInternal = requisition.type === RequisitionType.WAREHOUSE || 
+                             requisition.type === RequisitionType.SHOP_USE || 
+                             requisition.type === RequisitionType.SHOP_QR || 
+                             requisition.type === RequisitionType.WAREHOUSE_QR;
 
   // Logo Support: The user can upload logo.png or save to Firestore
   try {
@@ -123,8 +131,6 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
     doc.setFont('', 'normal');
     doc.text(requisition.creatorName, 55, textStartY + 31);
 
-    const isInternalInternal = requisition.type === 'Warehouse' || requisition.type === 'Shop Use' || requisition.type === 'Shop QR' || requisition.type === 'Warehouse QR';
-
     if (!isInternalInternal) {
       doc.setFont('', 'bold');
       doc.text('Written To:', 14, textStartY + 38);
@@ -181,7 +187,7 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
 
 
   const isQR = requisition.type === 'Shop QR' || requisition.type === 'Warehouse QR';
-  const hasCodeColumn = requisition.type === 'Warehouse' || requisition.type === 'Shop Use' || isQR || requisition.type === 'Quotations';
+  const hasCodeColumn = (requisition.type === 'Warehouse' || requisition.type === 'Shop Use' || isQR || requisition.type === 'Quotations') && !(isTreasurer && isInternalInternal);
   const hasPricingColumns = !isQR && requisition.type !== 'Fuel';
   const isFuel = requisition.type === 'Fuel';
   const currency = requisition.currency || 'USD';
@@ -250,7 +256,16 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
 
   // Approval History & Signatures (ONLY for Internal Requisitions)
   if (!isQuotation) {
-    const finalY = (doc as any).lastAutoTable.finalY + 15;
+    let finalY = (doc as any).lastAutoTable.finalY + 15;
+    
+    // Check if we have enough space for the workflow history
+    // estimated 50 units for header + 10 units per row
+    const estimatedHeight = 20 + (requisition.approvals.length * 15);
+    if (finalY + estimatedHeight > pageHeight - 30) {
+      doc.addPage();
+      finalY = 20;
+    }
+
     doc.setFontSize(12);
     doc.setFont('', 'bold');
     doc.text('Approval Workflow History', 14, finalY);
@@ -258,7 +273,8 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
     // Pre-generate QR codes for approvals
     const approvalWithQR = await Promise.all(requisition.approvals.map(async (approval) => {
       let qrDataUrl = '';
-      if (approval.signatureId) {
+      const isInternalHidden = isTreasurer && isInternalInternal;
+      if (approval.signatureId && !isInternalHidden) {
         const verifyUrl = `${getPublicOrigin()}/?verify=${approval.signatureId}&reqId=${requisition.id}`;
         qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 100 });
       }
@@ -294,7 +310,14 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
     
     // Disbursement Section (if exists)
     if (requisition.status === 'processed' && requisition.issuedInfo) {
-      const nextY = (doc as any).lastAutoTable.finalY + 10;
+      let nextY = (doc as any).lastAutoTable.finalY + 15;
+      
+      // Check for space
+      if (nextY + 45 > pageHeight - 20) {
+        doc.addPage();
+        nextY = 20;
+      }
+
       doc.setFontSize(11);
       doc.setTextColor(0, 50, 150);
       doc.setFont('', 'bold');
@@ -334,12 +357,18 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
         doc.text('Amount Returned:', 14, nextY + 31);
         doc.setFont('', 'normal');
         doc.text(`${symbol}${requisition.amountToReturn?.toFixed(2)}${suffix}`, 45, nextY + 31);
-      } else if (requisition.changeReturned && requisition.changeReturned > 0) {
+      } else {
+        const changeVal = requisition.changeReturned || 0;
+        const isPending = requisition.returnStatus === 'pending' || (changeVal > 0 && requisition.returnStatus === 'none');
+        
         doc.setFont('', 'bold');
-        doc.setTextColor(150, 100, 0);
-        doc.text('Change Due:', 14, nextY + 31);
+        if (isPending) doc.setTextColor(200, 100, 0);
+        else doc.setTextColor(100, 100, 100);
+        
+        doc.text('Change / Balance:', 14, nextY + 31);
         doc.setFont('', 'normal');
-        doc.text(`${symbol}${requisition.changeReturned.toFixed(2)}${suffix}`, 45, nextY + 31);
+        doc.text(`${symbol}${changeVal.toFixed(2)}${suffix}${isPending ? ' (PENDING RETURN)' : ''}`, 45, nextY + 31);
+        doc.setTextColor(26, 26, 26);
       }
 
       // QR Code for Issuance
@@ -353,7 +382,6 @@ export const generateRequisitionPDF = async (requisition: Requisition) => {
   }
 
   // Footer / Verification note
-  const pageHeight = doc.internal.pageSize.height;
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
   doc.text(

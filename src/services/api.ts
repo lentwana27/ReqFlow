@@ -480,7 +480,36 @@ export const requisitionService = {
         // Unverified users can ONLY see their own requisitions
         if (!userProfile.isVerified) return false;
         
-        const isApproverInChain = req.approvals.some(approval => approval.role === userProfile.role);
+        const isApproverInChain = req.approvals.some(approval => {
+          if (approval.role === userProfile.role) return true;
+          
+          // Role alias/HOD matching logic
+          if (approval.role === UserRole.HOD) {
+            if (req.department === Department.IT && userProfile.role === UserRole.IT_HOD) return true;
+            if (req.department === Department.WAREHOUSE && userProfile.role === UserRole.WAREHOUSE_HOD) return true;
+            if (req.department === Department.PURCHASING && userProfile.role === UserRole.PURCHASING_HOD) return true;
+            if (req.department === Department.SHOP && userProfile.role === UserRole.SHOP_HOD) return true;
+            if (userProfile.role === UserRole.HOD && userProfile.department === req.department) return true;
+          }
+          
+          if (approval.role === UserRole.IT_HOD) {
+            if (userProfile.role === UserRole.HOD && userProfile.department === Department.IT) return true;
+          }
+          
+          if (approval.role === UserRole.WAREHOUSE_HOD) {
+            if (userProfile.role === UserRole.HOD && userProfile.department === Department.WAREHOUSE) return true;
+          }
+
+          if (approval.role === UserRole.PURCHASING_HOD) {
+            if (userProfile.role === UserRole.HOD && userProfile.department === Department.PURCHASING) return true;
+          }
+
+          if (approval.role === UserRole.SHOP_HOD) {
+            if (userProfile.role === UserRole.HOD && userProfile.department === Department.SHOP) return true;
+          }
+          
+          return false;
+        });
         if (isApproverInChain) return true;
 
         const isFinanceOrTreasurer = userProfile.role === UserRole.FINANCE_HOD || userProfile.role === UserRole.TREASURER;
@@ -490,8 +519,13 @@ export const requisitionService = {
           return true;
         }
 
+        // Treasurer also sees items with pending fund returns
+        if (userProfile.role === UserRole.TREASURER && req.returnStatus === 'pending') {
+          return true;
+        }
+
         // Past requisitions (processed) are only visible to creators and high-privilege users (handled by early return above)
-        if (req.status === 'processed') return false;
+        if (req.status === 'processed' && req.returnStatus !== 'pending' && req.returnStatus !== 'confirmed') return false;
 
         return false;
       });

@@ -144,7 +144,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     }
     setIsDownloading(true);
     try {
-      await generateRequisitionPDF(requisition);
+      await generateRequisitionPDF(requisition, userProfile.role);
     } catch (error) {
       console.error('PDF Generation failed:', error);
     } finally {
@@ -162,11 +162,29 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     if (targetRole === 'Accounting HOD' && userProfile.role === UserRole.FINANCE_HOD) return true;
     if (targetRole === 'Shop Supervisor' && userProfile.role === UserRole.SHOP_MANAGER) return true;
 
-    // Resolve generic HOD to department-specific HOD
+    // Resolving generic HOD to department-specific HOD and vice-versa
     if (targetRole === UserRole.HOD) {
       if (reqDept === Department.IT && userProfile.role === UserRole.IT_HOD) return true;
       if (reqDept === Department.WAREHOUSE && userProfile.role === UserRole.WAREHOUSE_HOD) return true;
+      if (reqDept === Department.PURCHASING && userProfile.role === UserRole.PURCHASING_HOD) return true;
+      if (reqDept === Department.SHOP && userProfile.role === UserRole.SHOP_HOD) return true;
       return userProfile.role === UserRole.HOD && userProfile.department === reqDept;
+    }
+
+    if (targetRole === UserRole.IT_HOD) {
+      if (userProfile.role === UserRole.HOD && userProfile.department === Department.IT) return true;
+    }
+
+    if (targetRole === UserRole.WAREHOUSE_HOD) {
+      if (userProfile.role === UserRole.HOD && userProfile.department === Department.WAREHOUSE) return true;
+    }
+
+    if (targetRole === UserRole.PURCHASING_HOD) {
+      if (userProfile.role === UserRole.HOD && userProfile.department === Department.PURCHASING) return true;
+    }
+
+    if (targetRole === UserRole.SHOP_HOD) {
+      if (userProfile.role === UserRole.HOD && userProfile.department === Department.SHOP) return true;
     }
 
     return false;
@@ -491,19 +509,41 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                 </div>
               )}
               {requisition.changeReturned !== undefined && requisition.changeReturned > 0 && (
-                <div className="bg-amber-50 p-2 border border-amber-100 rounded-sm">
-                  <label className="text-[9px] uppercase font-bold text-amber-600 block">Change to be Returned</label>
-                  <p className="text-sm font-bold text-amber-800">{symbol}{requisition.changeReturned.toFixed(2)}{suffix}</p>
+                <div className={`p-4 border rounded-sm transition-all duration-500 ${
+                  requisition.returnStatus === 'none' || !requisition.returnStatus 
+                  ? 'bg-amber-100 border-amber-400 animate-pulse shadow-md ring-2 ring-amber-500/20' 
+                  : 'bg-amber-50 border-amber-100'
+                }`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className={`w-4 h-4 ${requisition.returnStatus === 'none' || !requisition.returnStatus ? 'text-amber-700' : 'text-amber-600'}`} />
+                    <label className={`text-[10px] uppercase font-black ${requisition.returnStatus === 'none' || !requisition.returnStatus ? 'text-amber-900' : 'text-amber-600'} block`}>
+                      Change to be Returned
+                    </label>
+                  </div>
+                  <p className={`text-xl font-black ${requisition.returnStatus === 'none' || !requisition.returnStatus ? 'text-amber-900' : 'text-amber-800'}`}>
+                    {symbol}{requisition.changeReturned.toFixed(2)}{suffix}
+                  </p>
+                  {(requisition.returnStatus === 'none' || !requisition.returnStatus) && (
+                    <p className="text-[10px] font-bold text-amber-700 mt-1 italic">
+                      {requisition.creatorId === userProfile.uid ? '!!! ACTION REQUIRED: RETURN THIS CHANGE TO THE OFFICE !!!' : 'Waiting for creator to return funds'}
+                    </p>
+                  )}
                 </div>
               )}
               {requisition.returnStatus && requisition.returnStatus !== 'none' && (
-                <div className={`${requisition.returnStatus === 'confirmed' ? 'bg-green-50 border-green-100' : 'bg-blue-50 border-blue-100'} p-2 border rounded-sm`}>
-                  <label className={`text-[9px] uppercase font-bold ${requisition.returnStatus === 'confirmed' ? 'text-green-600' : 'text-blue-600'} block`}>
-                    Funds Return {requisition.returnStatus === 'confirmed' ? '(CONFIRMED)' : '(PENDING)'}
-                  </label>
-                  <p className={`text-sm font-bold ${requisition.returnStatus === 'confirmed' ? 'text-green-800' : 'text-blue-800'}`}>
+                <div className={`${requisition.returnStatus === 'confirmed' ? 'bg-green-50 border-green-100' : 'bg-blue-100 border-blue-400 animate-pulse shadow-md ring-2 ring-blue-500/20'} p-4 border rounded-sm`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    {requisition.returnStatus === 'confirmed' ? <Check className="w-4 h-4 text-green-600" /> : <Clock className="w-4 h-4 text-blue-700" />}
+                    <label className={`text-[10px] uppercase font-black ${requisition.returnStatus === 'confirmed' ? 'text-green-600' : 'text-blue-900'} block`}>
+                      Funds Return {requisition.returnStatus === 'confirmed' ? '(CONFIRMED)' : '(PENDING TREASURER ACTION)'}
+                    </label>
+                  </div>
+                  <p className={`text-xl font-black ${requisition.returnStatus === 'confirmed' ? 'text-green-800' : 'text-blue-900'}`}>
                     {requisition.type === RequisitionType.FUEL ? `${requisition.amountToReturn} L` : `${symbol}${requisition.amountToReturn?.toFixed(2)}${suffix}`}
                   </p>
+                  {requisition.returnStatus === 'pending' && userProfile.role === UserRole.TREASURER && (
+                    <p className="text-[10px] font-bold text-blue-700 mt-1 italic underline">TREASURER: PLEASE VERIFY AND CONFIRM RECEIPT BELOW</p>
+                  )}
                 </div>
               )}
             </div>
@@ -539,8 +579,21 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
             <label className="input-label">Requested Items</label>
             <div className="border border-gray-100 rounded-sm overflow-hidden text-sm">
               {(() => {
-                const hasCodeColumn = requisition.type === RequisitionType.WAREHOUSE || requisition.type === RequisitionType.SHOP_USE || requisition.type === RequisitionType.SHOP_QR || requisition.type === RequisitionType.WAREHOUSE_QR || requisition.type === RequisitionType.QUOTATIONS;
-                const hasPricingColumns = requisition.type !== RequisitionType.SHOP_QR && requisition.type !== RequisitionType.WAREHOUSE_QR && requisition.type !== RequisitionType.FUEL;
+                const isInternalInternal = requisition.type === RequisitionType.WAREHOUSE || 
+                                           requisition.type === RequisitionType.SHOP_USE || 
+                                           requisition.type === RequisitionType.SHOP_QR || 
+                                           requisition.type === RequisitionType.WAREHOUSE_QR;
+                
+                const hasCodeColumn = (requisition.type === RequisitionType.WAREHOUSE || 
+                                      requisition.type === RequisitionType.SHOP_USE || 
+                                      requisition.type === RequisitionType.SHOP_QR || 
+                                      requisition.type === RequisitionType.WAREHOUSE_QR || 
+                                      requisition.type === RequisitionType.QUOTATIONS) && 
+                                      !(isTreasurer && isInternalInternal);
+                
+                const hasPricingColumns = requisition.type !== RequisitionType.SHOP_QR && 
+                                         requisition.type !== RequisitionType.WAREHOUSE_QR && 
+                                         requisition.type !== RequisitionType.FUEL;
                 const isFuel = requisition.type === RequisitionType.FUEL;
                 
                 return (
@@ -665,7 +718,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-bold uppercase tracking-tight">{approval.role}</p>
-                          {approval.signatureId && (
+                          {approval.signatureId && !((isTreasurer || userProfile.role === 'Treasurer') && (requisition.type as any).includes('Internal')) && (
                             <div className="flex items-center gap-2">
                               <div 
                                 className="p-1.5 bg-white border border-gray-200 rounded-sm shadow-sm hover:scale-[2] transition-transform cursor-pointer origin-left z-20"
