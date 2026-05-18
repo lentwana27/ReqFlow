@@ -26,7 +26,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [reportType, setReportType] = useState<RequisitionType | 'ALL'>('ALL');
-  const [tab, setTab] = useState<'ALL' | 'ACTION' | 'MY'>('ALL');
+  const [tab, setTab] = useState<'ALL' | 'ACTION' | 'MY' | 'RETURNS'>('ALL');
   const [isExporting, setIsExporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -113,6 +113,10 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       if (!isApprover && !isProcessor && !isTreasurerReturn) {
         return false;
       }
+    } else if (tab === 'RETURNS') {
+      const hasPendingReturn = req.returnStatus === 'pending';
+      const hasChangeDue = req.status === 'processed' && req.changeReturned && req.changeReturned > 0 && (req.returnStatus === 'none' || !req.returnStatus);
+      if (!hasPendingReturn && !hasChangeDue) return false;
     } else if (tab === 'MY') {
       if (req.creatorId !== userProfile.uid) return false;
     }
@@ -392,6 +396,15 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           >
             My Submissions ({requisitions.filter(r => r.creatorId === userProfile.uid).length})
           </button>
+          {[UserRole.TREASURER, UserRole.FINANCE_HOD, UserRole.ADMIN].includes(userProfile.role) && (
+            <button 
+              onClick={() => setTab('RETURNS')}
+              className={`text-xs font-bold uppercase tracking-wider pb-4 border-b-2 transition-all flex items-center gap-2 ${tab === 'RETURNS' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+            >
+              Funds Returns ({requisitions.filter(r => r.returnStatus === 'pending' || (r.status === 'processed' && r.changeReturned && r.changeReturned > 0 && (!r.returnStatus || r.returnStatus === 'none'))).length})
+              {requisitions.some(r => r.returnStatus === 'pending') && <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />}
+            </button>
+          )}
         </div>
 
         <div className="p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4 bg-gray-50/50">
@@ -582,6 +595,11 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                         {req.processedNumber && (
                           <span className="text-[9px] font-mono font-bold text-green-700 bg-green-50 px-1 border border-green-100 rounded-sm">
                             {req.processedNumber}
+                          </span>
+                        )}
+                        {(req.changeReturned && req.changeReturned > 0) && (
+                          <span className={`text-[9px] font-bold px-1 border rounded-sm ${req.returnStatus === 'confirmed' ? 'text-green-700 bg-green-50 border-green-100' : 'text-amber-700 bg-amber-50 border-amber-100'}`}>
+                            Balance: {req.currency === Currency.USD || !req.currency ? '$' : ''}{req.changeReturned.toFixed(2)}
                           </span>
                         )}
                       </div>

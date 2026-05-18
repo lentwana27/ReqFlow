@@ -516,6 +516,11 @@ export const requisitionService = {
         const isApprovedOrProcessed = req.status === 'approved' || req.status === 'processed';
         
         if (isFinanceOrTreasurer && isApprovedOrProcessed) {
+          // If Treasurer, hide internal non-monetary types
+          if (userProfile.role === UserRole.TREASURER) {
+            const internalTypes = [RequisitionType.WAREHOUSE, RequisitionType.SHOP_USE, RequisitionType.SHOP_QR, RequisitionType.WAREHOUSE_QR];
+            if (internalTypes.includes(req.type as any)) return false;
+          }
           return true;
         }
 

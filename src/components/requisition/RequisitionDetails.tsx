@@ -718,7 +718,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-bold uppercase tracking-tight">{approval.role}</p>
-                          {approval.signatureId && !((isTreasurer || userProfile.role === 'Treasurer') && (requisition.type as any).includes('Internal')) && (
+                          {approval.signatureId && !((isTreasurer || userProfile.role === UserRole.TREASURER) && (requisition.type === RequisitionType.WAREHOUSE || requisition.type === RequisitionType.SHOP_USE || requisition.type === RequisitionType.SHOP_QR || requisition.type === RequisitionType.WAREHOUSE_QR)) && (
                             <div className="flex items-center gap-2">
                               <div 
                                 className="p-1.5 bg-white border border-gray-200 rounded-sm shadow-sm hover:scale-[2] transition-transform cursor-pointer origin-left z-20"

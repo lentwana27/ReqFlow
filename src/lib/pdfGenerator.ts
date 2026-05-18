@@ -16,6 +16,16 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
   const isQuotation = requisition.type === 'Quotations';
   const isTreasurer = userRole === UserRole.TREASURER;
   
+  // If Treasurer is downloading, add a specific badge at the top
+  if (isTreasurer) {
+    doc.setFillColor(240, 240, 240);
+    doc.rect(pageWidth - 60, 5, 50, 7, 'F');
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.text('OFFICIAL TREASURY COPY', pageWidth - 55, 10);
+    doc.setTextColor(26, 26, 26);
+  }
+  
   // Internal types that should be partially hidden for the Treasurer
   const isInternalInternal = requisition.type === RequisitionType.WAREHOUSE || 
                              requisition.type === RequisitionType.SHOP_USE || 
@@ -351,25 +361,29 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
         doc.text(`${symbol}${requisition.amountIssued.toFixed(2)}${suffix}`, 45, nextY + 25);
       }
 
-      if (requisition.returnStatus === 'confirmed') {
-        doc.setFont('', 'bold');
+      // Financial Reconciliation for Treasurer/General Use
+      const changeVal = requisition.changeReturned || 0;
+      const isPending = requisition.returnStatus === 'pending' || (changeVal > 0 && (!requisition.returnStatus || requisition.returnStatus === 'none'));
+      const isConfirmed = requisition.returnStatus === 'confirmed';
+
+      doc.setFont('', 'bold');
+      if (isConfirmed) {
         doc.setTextColor(0, 100, 0);
-        doc.text('Amount Returned:', 14, nextY + 31);
+        doc.text('CHANGE RETURNED:', 14, nextY + 31);
         doc.setFont('', 'normal');
-        doc.text(`${symbol}${requisition.amountToReturn?.toFixed(2)}${suffix}`, 45, nextY + 31);
+        doc.text(`${symbol}${(requisition.amountToReturn || changeVal).toFixed(2)}${suffix} (CONFIRMED)`, 55, nextY + 31);
+      } else if (changeVal > 0) {
+        doc.setTextColor(isTreasurer ? 200 : 150, isTreasurer ? 0 : 100, 0);
+        doc.text('CHANGE REMAINING:', 14, nextY + 31);
+        doc.setFont('', 'normal');
+        doc.text(`${symbol}${changeVal.toFixed(2)}${suffix}${isPending ? ' (PENDING RETURN)' : ''}`, 55, nextY + 31);
       } else {
-        const changeVal = requisition.changeReturned || 0;
-        const isPending = requisition.returnStatus === 'pending' || (changeVal > 0 && requisition.returnStatus === 'none');
-        
-        doc.setFont('', 'bold');
-        if (isPending) doc.setTextColor(200, 100, 0);
-        else doc.setTextColor(100, 100, 100);
-        
-        doc.text('Change / Balance:', 14, nextY + 31);
+        doc.setTextColor(100, 100, 100);
+        doc.text('BALANCE:', 14, nextY + 31);
         doc.setFont('', 'normal');
-        doc.text(`${symbol}${changeVal.toFixed(2)}${suffix}${isPending ? ' (PENDING RETURN)' : ''}`, 45, nextY + 31);
-        doc.setTextColor(26, 26, 26);
+        doc.text(`${symbol}0.00${suffix} (BALANCED)`, 55, nextY + 31);
       }
+      doc.setTextColor(26, 26, 26);
 
       // QR Code for Issuance
       const verifyUrl = `${getPublicOrigin()}/?verify=${requisition.issuedInfo.signatureId}&reqId=${requisition.id}`;
