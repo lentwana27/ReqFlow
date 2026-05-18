@@ -1279,3 +1279,20 @@ export const brandingService = {
     }
   }
 };
+
+export const resendService = {
+  test: async (email: string) => {
+    const response = await fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: email,
+        subject: 'MINEAZY REQFLOW: Configuration Test',
+        body: `Hello,\n\nIf you are reading this email, your MINEAZY REQFLOW system is successfully connected to Resend.\n\nTest Date: ${new Date().toLocaleString()}\n\nYou can now participate in the requisition workflow with real-time email notifications.\n\nThank you,\nThe MINEAZY Team`.trim()
+      })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Test email failed');
+    return result;
+  }
+};

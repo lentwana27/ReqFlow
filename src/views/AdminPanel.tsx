@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { userService, requisitionService, auditService, authService, brandingService } from '../services/api';
+import { userService, requisitionService, auditService, authService, brandingService, resendService } from '../services/api';
 import { UserProfile, UserRole, Department, ROLES, DEPARTMENTS } from '../types';
 import {
   Users, CheckCircle2, XCircle, Search, Loader2,
   Lock, ArrowLeft, AlertCircle, RefreshCw, KeyRound,
-  Download, Calendar, Filter, Image as ImageIcon, Upload, ShieldAlert
+  Download, Calendar, Filter, Image as ImageIcon, Upload, ShieldAlert,
+  Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from '../context/ToastContext';
@@ -964,10 +965,32 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
                     </p>
                   </div>
                 </div>
-                <div className="text-[11px] text-gray-500 max-w-md italic text-right">
-                  {systemStatus.email.configured 
-                    ? `Active using Resend. Emails from: ${systemStatus.email.from}`
-                    : `RESEND_API_KEY is missing. Emails are currently being simulated only.`}
+                <div className="flex items-center gap-4">
+                  <div className="text-[11px] text-gray-500 max-w-md italic text-right">
+                    {systemStatus.email.configured 
+                      ? `Active using Resend. Emails from: ${systemStatus.email.from}`
+                      : `RESEND_API_KEY is missing. Emails are currently being simulated only.`}
+                  </div>
+                  {systemStatus.email.configured && (
+                    <button
+                      onClick={async () => {
+                        const email = prompt('Enter your email address to receive a test message:', userProfile?.email || '');
+                        if (!email) return;
+                        
+                        try {
+                          showToast('Sending test email...');
+                          await resendService.test(email);
+                          showToast('Test email sent successfully! Check your inbox.');
+                        } catch (err: any) {
+                          showToast(err.message || 'Failed to send test email', 'error');
+                        }
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-[10px] font-bold uppercase rounded-sm hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      Test Link
+                    </button>
+                  )}
                 </div>
               </div>
             )}
