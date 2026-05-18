@@ -484,14 +484,9 @@ export const requisitionService = {
         if (isApproverInChain) return true;
 
         const isFinanceOrTreasurer = userProfile.role === UserRole.FINANCE_HOD || userProfile.role === UserRole.TREASURER;
-        const isApprovedItem = req.status === 'approved';
+        const isApprovedOrProcessed = req.status === 'approved' || req.status === 'processed';
         
-        if (isFinanceOrTreasurer && isApprovedItem) {
-          // If Treasurer, further restrict by allowed types
-          if (userProfile.role === UserRole.TREASURER) {
-            const allowedTypes = [RequisitionType.ADMIN, RequisitionType.PURCHASING, RequisitionType.WORKSHOP, RequisitionType.FUEL, RequisitionType.FINANCE];
-            return allowedTypes.includes(req.type as any);
-          }
+        if (isFinanceOrTreasurer && isApprovedOrProcessed) {
           return true;
         }
 
