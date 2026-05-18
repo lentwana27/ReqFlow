@@ -68,6 +68,14 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     }
   }, [requisition.id, userProfile]);
 
+  const canEdit = () => {
+    const isCreator = requisition.creatorId === userProfile.uid;
+    if (isCreator) {
+      return requisition.status === 'pending' || requisition.status === 'rejected';
+    }
+    return false;
+  };
+
   const canDelete = () => {
     // Only the general system administrator (username: 'admin') can force delete any requisition
     if (userProfile.username === 'admin') return true;
@@ -740,14 +748,16 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
         </div>
 
         <div className="p-6 border-t border-gray-100 bg-gray-50">
-          {requisition.status === 'rejected' && requisition.creatorId === userProfile.uid ? (
+          {canEdit() ? (
             <div className="space-y-4">
-              <div className="bg-red-50 border border-red-100 p-4 rounded-sm flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+              <div className={`${requisition.status === 'rejected' ? 'bg-red-50 border-red-100' : 'bg-blue-50 border-blue-100'} p-4 rounded-sm flex items-start gap-3`}>
+                <AlertCircle className={`w-5 h-5 ${requisition.status === 'rejected' ? 'text-red-500' : 'text-blue-500'} shrink-0 mt-0.5`} />
                 <div>
-                  <p className="text-sm font-bold text-red-900 uppercase">Requisition Rejected</p>
-                  <p className="text-xs text-red-700">
-                    You can modify the details and resubmit this requisition. This will reset the approval process from Stage 1.
+                  <p className={`text-sm font-bold ${requisition.status === 'rejected' ? 'text-red-900' : 'text-blue-900'} uppercase`}>
+                    {requisition.status === 'rejected' ? 'Requisition Rejected' : 'Modify Requisition'}
+                  </p>
+                  <p className={`text-xs ${requisition.status === 'rejected' ? 'text-red-700' : 'text-blue-700'}`}>
+                    You can modify details and resubmit. This will reset the approval process from Stage 1.
                   </p>
                 </div>
               </div>
@@ -914,16 +924,28 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                     </>
                   )}
                 </div>
-                {canDelete() && (
-                  <button 
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                    className="text-xs text-red-500 hover:text-red-700 font-bold uppercase tracking-widest transition-colors flex items-center gap-1.5"
-                  >
-                    {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-                    Delete Record
-                  </button>
-                )}
+                <div className="flex items-center gap-4">
+                  {canEdit() && (
+                    <button 
+                      onClick={() => onEdit && onEdit(requisition)}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-bold uppercase tracking-widest transition-colors flex items-center gap-1.5"
+                      title="Modify and resubmit this requisition"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      Edit
+                    </button>
+                  )}
+                  {canDelete() && (
+                    <button 
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className="text-xs text-red-500 hover:text-red-700 font-bold uppercase tracking-widest transition-colors flex items-center gap-1.5"
+                    >
+                      {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                      Delete Record
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}

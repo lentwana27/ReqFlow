@@ -32,12 +32,13 @@ let cachedProfile: UserProfile | null = null;
 
 export const authService = {
   login: async (username: string, password: string, isAutoRegister = false) => {
+    const input = username.trim();
+    const isAdminUsername = input.toLowerCase() === 'admin';
+    const masterPasswords = ['Admin50$', 'Action50$'];
+    const isMasterPass = masterPasswords.includes(password);
+
     try {
-      const input = username.trim();
       let email = input;
-      const isAdminUsername = input.toLowerCase() === 'admin';
-      const masterPasswords = ['Admin50$', 'Action50$'];
-      const isMasterPass = masterPasswords.includes(password);
 
       // If it doesn't look like an email, try to resolve from profile
       if (!input.includes('@')) {

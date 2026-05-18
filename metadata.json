@@ -2,5 +2,5 @@
   "name": "MINEAZY REQFLOW",
   "description": "A digital requisition processing system with automated multi-stage approval workflows for Admin, Warehouse, Purchasing, Fuel, and Shop Use.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["Multi-user workflows", "Reporting", "Role-based access"]
+  "majorCapabilities": ["Multi-user workflows", "Reporting", "Role-based access", "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
