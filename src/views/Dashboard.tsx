@@ -7,6 +7,7 @@ import { format, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import RequisitionDetails from '../components/requisition/RequisitionDetails';
 import { generateSummaryPDF } from '../lib/reportGenerator';
+import { checkRoleMatch } from '../lib/roleUtils';
 import { useToast } from '../context/ToastContext';
 
 interface DashboardProps {
@@ -47,7 +48,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           // Auto-switch to Action tab if there are items needing approval
           const needsApproval = localData.filter(r => {
             const currentApproval = r.approvals[r.currentStage];
-            const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+            const isApprover = r.status === 'pending' && currentApproval && checkRoleMatch(userProfile, currentApproval.role, r.department) && userProfile.isVerified;
             const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
             const isTreasurerReturn = userProfile.role === UserRole.TREASURER && r.returnStatus === 'pending' && userProfile.isVerified;
             return isApprover || isProcessor || isTreasurerReturn;
@@ -106,7 +107,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
     // 1. Tab Filter
     if (tab === 'ACTION') {
       const currentApproval = req.approvals[req.currentStage];
-      const isApprover = req.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+      const isApprover = req.status === 'pending' && currentApproval && checkRoleMatch(userProfile, currentApproval.role, req.department) && userProfile.isVerified;
       const isProcessor = req.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
       const isTreasurerReturn = userProfile.role === UserRole.TREASURER && req.returnStatus === 'pending' && userProfile.isVerified;
       
@@ -304,7 +305,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       label: 'Pending My Action', 
       count: requisitions.filter(r => {
         const currentApproval = r.approvals[r.currentStage];
-        const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+        const isApprover = r.status === 'pending' && currentApproval && checkRoleMatch(userProfile, currentApproval.role, r.department) && userProfile.isVerified;
         const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
         const isTreasurerReturn = userProfile.role === UserRole.TREASURER && r.returnStatus === 'pending' && userProfile.isVerified;
         return isApprover || isProcessor || isTreasurerReturn;
@@ -377,14 +378,14 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           >
             Action Items ({requisitions.filter(r => {
               const currentApproval = r.approvals[r.currentStage];
-              const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+              const isApprover = r.status === 'pending' && currentApproval && checkRoleMatch(userProfile, currentApproval.role, r.department) && userProfile.isVerified;
               const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
               const isTreasurerReturn = userProfile.role === UserRole.TREASURER && r.returnStatus === 'pending' && userProfile.isVerified;
               return isApprover || isProcessor || isTreasurerReturn;
             }).length})
             {requisitions.some(r => {
               const currentApproval = r.approvals[r.currentStage];
-              const isApprover = r.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+              const isApprover = r.status === 'pending' && currentApproval && checkRoleMatch(userProfile, currentApproval.role, r.department) && userProfile.isVerified;
               const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
               const isTreasurerReturn = userProfile.role === UserRole.TREASURER && r.returnStatus === 'pending' && userProfile.isVerified;
               return isApprover || isProcessor || isTreasurerReturn;
@@ -501,7 +502,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
             <tbody>
               {paginatedRequisitions.map((req) => {
                 const currentApproval = req.approvals[req.currentStage];
-                const isApprover = req.status === 'pending' && currentApproval && currentApproval.role === userProfile.role && userProfile.isVerified;
+                const isApprover = req.status === 'pending' && currentApproval && checkRoleMatch(userProfile, currentApproval.role, req.department) && userProfile.isVerified;
                 const isProcessor = req.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
                 const isTreasurerReturn = userProfile.role === UserRole.TREASURER && req.returnStatus === 'pending' && userProfile.isVerified;
                 const needsMyAction = isApprover || isProcessor || isTreasurerReturn;

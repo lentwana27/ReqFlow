@@ -6,6 +6,7 @@ import { format, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { generateRequisitionPDF } from '../../lib/pdfGenerator';
+import { checkRoleMatch } from '../../lib/roleUtils';
 import { useToast } from '../../context/ToastContext';
 import { getPublicOrigin } from '../../lib/urls';
 
@@ -150,44 +151,6 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     } finally {
       setIsDownloading(false);
     }
-  };
-
-  const checkRoleMatch = (userProfile: UserProfile, targetRole: string, reqDept: Department) => {
-    if (userProfile.username === 'admin') return true;
-    
-    // Explicit match
-    if (userProfile.role === targetRole) return true;
-
-    // Backward compatibility for old requisitions created before recent role changes
-    if (targetRole === 'Accounting HOD' && userProfile.role === UserRole.FINANCE_HOD) return true;
-    if (targetRole === 'Shop Supervisor' && userProfile.role === UserRole.SHOP_MANAGER) return true;
-
-    // Resolving generic HOD to department-specific HOD and vice-versa
-    if (targetRole === UserRole.HOD) {
-      if (reqDept === Department.IT && userProfile.role === UserRole.IT_HOD) return true;
-      if (reqDept === Department.WAREHOUSE && userProfile.role === UserRole.WAREHOUSE_HOD) return true;
-      if (reqDept === Department.PURCHASING && userProfile.role === UserRole.PURCHASING_HOD) return true;
-      if (reqDept === Department.SHOP && userProfile.role === UserRole.SHOP_HOD) return true;
-      return userProfile.role === UserRole.HOD && userProfile.department === reqDept;
-    }
-
-    if (targetRole === UserRole.IT_HOD) {
-      if (userProfile.role === UserRole.HOD && userProfile.department === Department.IT) return true;
-    }
-
-    if (targetRole === UserRole.WAREHOUSE_HOD) {
-      if (userProfile.role === UserRole.HOD && userProfile.department === Department.WAREHOUSE) return true;
-    }
-
-    if (targetRole === UserRole.PURCHASING_HOD) {
-      if (userProfile.role === UserRole.HOD && userProfile.department === Department.PURCHASING) return true;
-    }
-
-    if (targetRole === UserRole.SHOP_HOD) {
-      if (userProfile.role === UserRole.HOD && userProfile.department === Department.SHOP) return true;
-    }
-
-    return false;
   };
 
   const canApprove = () => {
@@ -800,8 +763,8 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
           )}
         </div>
 
-        <div className="p-6 border-t border-gray-100 bg-gray-50">
-          {canEdit() ? (
+        <div className="p-6 border-t border-gray-100 bg-gray-50 flex flex-col gap-6">
+          {canEdit() && (
             <div className="space-y-4">
               <div className={`${requisition.status === 'rejected' ? 'bg-red-50 border-red-100' : 'bg-blue-50 border-blue-100'} p-4 rounded-sm flex items-start gap-3`}>
                 <AlertCircle className={`w-5 h-5 ${requisition.status === 'rejected' ? 'text-red-500' : 'text-blue-500'} shrink-0 mt-0.5`} />
@@ -821,8 +784,10 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                 <FileText className="w-4 h-4" /> Edit & Resubmit Requisition
               </button>
             </div>
-          ) : canApprove() ? (
-            <div className="space-y-4">
+          )}
+
+          {canApprove() && (
+            <div className="space-y-4 pt-4 border-t border-gray-200">
               <textarea 
                 placeholder="Add an optional comment..."
                 value={comment}
@@ -864,7 +829,9 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                 </div>
               )}
             </div>
-          ) : !userProfile.isVerified && userProfile.username !== 'admin' && checkRoleMatch(userProfile, requisition.approvals[requisition.currentStage]?.role || '', requisition.department) ? (
+          )}
+
+          {!userProfile.isVerified && userProfile.username !== 'admin' && requisition.status === 'pending' && checkRoleMatch(userProfile, requisition.approvals[requisition.currentStage]?.role || '', requisition.department) && !canApprove() && (
              <div className="p-6 bg-amber-50 border border-amber-200 rounded-sm flex flex-col items-center text-center gap-3">
                 <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center text-amber-600">
                   <Lock className="w-5 h-5" />
@@ -877,8 +844,10 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                   </p>
                 </div>
              </div>
-          ) : canProcess ? (
-            <div className="space-y-4">
+          )}
+
+          {canProcess && (
+            <div className="space-y-4 pt-4 border-t border-gray-200">
               <div className="bg-blue-50 border border-blue-100 p-4 rounded-sm">
                 <p className="text-xs text-blue-700 font-medium flex items-center gap-2">
                   <Check className="w-4 h-4" /> Requisition is fully approved. Ready for fund disbursement.
@@ -904,104 +873,92 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                 {isProcessing === 'processed' ? 'Disbursing...' : isSuccess ? 'Processed!' : 'Disburse & Mark Processed'}
               </button>
             </div>
-          ) : (
-            <div className="space-y-6">
-              {canConfirmReturn && (
-                <div className="bg-green-50 border border-green-100 p-6 rounded-sm space-y-4">
-                  <div className="flex items-start gap-3">
-                    <Check className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="text-xs font-black text-green-900 uppercase">Confirm Return of Funds</h4>
-                      <p className="text-[10px] text-green-600 leading-relaxed mt-0.5">
-                        The requester is returning {symbol}{requisition.amountToReturn?.toFixed(2)}{suffix}. Verify receipt.
-                      </p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={async () => {
-                      try {
-                        await handleUpdateStatus('processed', false, 'Funds Receipt Confirmed', {
-                          returnStatus: 'confirmed'
-                        });
-                        showToast('Funds return confirmed', 'success');
-                      } catch (err) {
-                        showToast('Failed to confirm return', 'error');
-                      }
-                    }}
-                    disabled={!!isProcessing || isSuccess}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-sm text-sm uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
-                  >
-                    {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
-                    Confirm Receipt
-                  </button>
-                </div>
-              )}
+          )}
 
-              {canRequestReturn && (
-                <div className="bg-amber-50 border border-amber-100 p-6 rounded-sm space-y-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="text-xs font-black text-amber-900 uppercase">Return Unused Funds</h4>
-                      <p className="text-[10px] text-amber-600 leading-relaxed mt-0.5">
-                        If you have unused funds from this requisition, click below to initiate a return.
-                      </p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setIsReturnModalOpen(true)}
-                    className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-sm text-sm uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
-                  >
-                    <ArrowRight className="w-4 h-4" />
-                    Return Funds
-                  </button>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs text-gray-400 font-medium font-bold">
-                  {requisition.status === 'pending' ? (
-                    <>
-                      <Clock className="w-4 h-4" /> 
-                      <span>Waiting for {requisition.approvals[requisition.currentStage]?.role}</span>
-                    </>
-                  ) : requisition.status === 'processed' ? (
-                    <>
-                      <Check className="w-4 h-4 text-green-600" />
-                      <span className="text-green-600 uppercase font-black tracking-widest">Requisition Issued</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4 text-blue-600" />
-                      <span className="text-blue-600 uppercase">Status: {requisition.status === 'approved' ? 'Completed' : requisition.status}</span>
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-4">
-                  {canEdit() && (
-                    <button 
-                      onClick={() => onEdit && onEdit(requisition)}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-bold uppercase tracking-widest transition-colors flex items-center gap-1.5"
-                      title="Modify and resubmit this requisition"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      Edit
-                    </button>
-                  )}
-                  {canDelete() && (
-                    <button 
-                      onClick={handleDelete}
-                      disabled={isDeleting}
-                      className="text-xs text-red-500 hover:text-red-700 font-bold uppercase tracking-widest transition-colors flex items-center gap-1.5"
-                    >
-                      {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-                      Delete Record
-                    </button>
-                  )}
+          {canConfirmReturn && (
+            <div className="bg-green-50 border border-green-100 p-6 rounded-sm space-y-4">
+              <div className="flex items-start gap-3">
+                <Check className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-xs font-black text-green-900 uppercase">Confirm Return of Funds</h4>
+                  <p className="text-[10px] text-green-600 leading-relaxed mt-0.5">
+                    The requester is returning {symbol}{requisition.amountToReturn?.toFixed(2)}{suffix}. Verify receipt.
+                  </p>
                 </div>
               </div>
+              <button 
+                onClick={async () => {
+                  try {
+                    await handleUpdateStatus('processed', false, 'Funds Receipt Confirmed', {
+                      returnStatus: 'confirmed'
+                    });
+                    showToast('Funds return confirmed', 'success');
+                  } catch (err) {
+                    showToast('Failed to confirm return', 'error');
+                  }
+                }}
+                disabled={!!isProcessing || isSuccess}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-sm text-sm uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
+              >
+                {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+                Confirm Receipt
+              </button>
             </div>
           )}
+
+          {canRequestReturn && (
+            <div className="bg-amber-50 border border-amber-100 p-6 rounded-sm space-y-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-xs font-black text-amber-900 uppercase">Return Unused Funds</h4>
+                  <p className="text-[10px] text-amber-600 leading-relaxed mt-0.5">
+                    If you have unused funds from this requisition, click below to initiate a return.
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsReturnModalOpen(true)}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-sm text-sm uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
+              >
+                <ArrowRight className="w-4 h-4" />
+                Return Funds
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200 mt-auto">
+            <div className="flex items-center gap-2 text-xs text-gray-400 font-medium font-bold">
+              {requisition.status === 'pending' ? (
+                <>
+                  <Clock className="w-4 h-4" /> 
+                  <span>Waiting for {requisition.approvals[requisition.currentStage]?.role}</span>
+                </>
+              ) : requisition.status === 'processed' ? (
+                <>
+                  <Check className="w-4 h-4 text-green-600" />
+                  <span className="text-green-600 uppercase font-black tracking-widest">Requisition Issued</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 text-blue-600" />
+                  <span className="text-blue-600 uppercase">Status: {requisition.status === 'approved' ? 'Completed' : requisition.status}</span>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              {canDelete() && (
+                <button 
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="text-xs text-red-500 hover:text-red-700 font-bold uppercase tracking-widest transition-colors flex items-center gap-1.5"
+                >
+                  {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                  Delete Record
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </motion.div>
 
