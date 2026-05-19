@@ -27,6 +27,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
   const [amountIssued, setAmountIssued] = useState<string>('');
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [amountToReturnRaw, setAmountToReturnRaw] = useState<string>('');
+  const [returnTypeSelection, setReturnTypeSelection] = useState<'funds' | 'change'>('funds');
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -362,7 +363,8 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     RequisitionType.PURCHASING,
     RequisitionType.PROJECTS,
     RequisitionType.IT,
-    RequisitionType.FUEL
+    RequisitionType.FUEL,
+    RequisitionType.MARKETING
   ];
 
   const canRequestReturn = requisition.status === 'processed' && 
@@ -880,9 +882,9 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
               <div className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-xs font-black text-green-900 uppercase">Confirm Return of Funds</h4>
+                  <h4 className="text-xs font-black text-green-900 uppercase">Confirm Return of {requisition.returnType === 'change' ? 'Change' : 'Funds'}</h4>
                   <p className="text-[10px] text-green-600 leading-relaxed mt-0.5">
-                    The requester is returning {symbol}{requisition.amountToReturn?.toFixed(2)}{suffix}. Verify receipt.
+                    The requester is returning {symbol}{requisition.amountToReturn?.toFixed(2)}{suffix} as {requisition.returnType || 'funds'}. Verify receipt.
                   </p>
                 </div>
               </div>
@@ -911,18 +913,27 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-xs font-black text-amber-900 uppercase">Return Unused Funds</h4>
+                  <h4 className="text-xs font-black text-amber-900 uppercase">Return Funds / Change</h4>
                   <p className="text-[10px] text-amber-600 leading-relaxed mt-0.5">
-                    If you have unused funds from this requisition, click below to initiate a return.
+                    If you have unused funds or change from this requisition, click below to initiate a return.
                   </p>
                 </div>
               </div>
               <button 
-                onClick={() => setIsReturnModalOpen(true)}
+                onClick={() => {
+                  setIsReturnModalOpen(true);
+                  if (requisition.changeReturned && requisition.changeReturned > 0) {
+                    setReturnTypeSelection('change');
+                    setAmountToReturnRaw(requisition.changeReturned.toString());
+                  } else {
+                    setReturnTypeSelection('funds');
+                    setAmountToReturnRaw('');
+                  }
+                }}
                 className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-sm text-sm uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
               >
                 <ArrowRight className="w-4 h-4" />
-                Return Funds
+                Return Funds / Change
               </button>
             </div>
           )}
@@ -1124,6 +1135,32 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                 </button>
               </div>
               <div className="p-6 space-y-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-gray-400">Return Type</label>
+                  <div className="flex bg-gray-100 p-1 rounded-sm">
+                    <button
+                      className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-colors ${returnTypeSelection === 'funds' ? 'bg-white shadow-sm text-amber-700' : 'text-gray-500 hover:text-gray-700'}`}
+                      onClick={() => {
+                        setReturnTypeSelection('funds');
+                        setAmountToReturnRaw('');
+                      }}
+                    >
+                      Funds
+                    </button>
+                    <button
+                      className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-colors ${returnTypeSelection === 'change' ? 'bg-white shadow-sm text-amber-700' : 'text-gray-500 hover:text-gray-700'}`}
+                      onClick={() => {
+                        setReturnTypeSelection('change');
+                        if (requisition.changeReturned && requisition.changeReturned > 0) {
+                          setAmountToReturnRaw(requisition.changeReturned.toString());
+                        }
+                      }}
+                    >
+                      Change
+                    </button>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase font-black tracking-widest text-gray-400">Amount to Return ({currency})</label>
                   <input 
@@ -1156,6 +1193,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                         await requisitionService.update(requisition.id, {
                           amountToReturn: amount,
                           returnStatus: 'pending',
+                          returnType: returnTypeSelection,
                           updatedAt: new Date().toISOString()
                         });
                         showToast('Return request submitted for Treasurer approval', 'success');

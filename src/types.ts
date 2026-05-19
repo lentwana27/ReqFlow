@@ -119,6 +119,7 @@ export interface Requisition {
   changeReturned?: number;
   amountToReturn?: number;
   returnStatus?: 'none' | 'pending' | 'confirmed';
+  returnType?: 'funds' | 'change';
   createdAt: any;
   updatedAt: any;
 }

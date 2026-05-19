@@ -358,30 +358,35 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
         doc.setFont('', 'bold');
         doc.text('Amount Issued:', 14, nextY + 25);
         doc.setFont('', 'normal');
-        doc.text(`${symbol}${requisition.amountIssued.toFixed(2)}${suffix}`, 45, nextY + 25);
+        if (isFuel) {
+          doc.text(`${requisition.amountIssued} L`, 45, nextY + 25);
+        } else {
+          doc.text(`${symbol}${requisition.amountIssued.toFixed(2)}${suffix}`, 45, nextY + 25);
+        }
       }
 
       // Financial Reconciliation for Treasurer/General Use
-      const changeVal = requisition.changeReturned || 0;
+      const changeVal = requisition.amountToReturn || requisition.changeReturned || 0;
       const isPending = requisition.returnStatus === 'pending' || (changeVal > 0 && (!requisition.returnStatus || requisition.returnStatus === 'none'));
       const isConfirmed = requisition.returnStatus === 'confirmed';
 
       doc.setFont('', 'bold');
+      const returnTypeLabel = requisition.returnType === 'funds' ? 'FUNDS' : 'CHANGE';
       if (isConfirmed) {
         doc.setTextColor(0, 100, 0);
-        doc.text('CHANGE RETURNED:', 14, nextY + 31);
+        doc.text(`${returnTypeLabel} RETURNED:`, 14, nextY + 31);
         doc.setFont('', 'normal');
-        doc.text(`${symbol}${(requisition.amountToReturn || changeVal).toFixed(2)}${suffix} (CONFIRMED)`, 55, nextY + 31);
+        doc.text(isFuel ? `${changeVal} L (CONFIRMED)` : `${symbol}${changeVal.toFixed(2)}${suffix} (CONFIRMED)`, 45, nextY + 31);
       } else if (changeVal > 0) {
         doc.setTextColor(isTreasurer ? 200 : 150, isTreasurer ? 0 : 100, 0);
-        doc.text('CHANGE REMAINING:', 14, nextY + 31);
+        doc.text(`${returnTypeLabel} REMAINING:`, 14, nextY + 31);
         doc.setFont('', 'normal');
-        doc.text(`${symbol}${changeVal.toFixed(2)}${suffix}${isPending ? ' (PENDING RETURN)' : ''}`, 55, nextY + 31);
+        doc.text(isFuel ? `${changeVal} L${isPending ? ' (PENDING)' : ''}` : `${symbol}${changeVal.toFixed(2)}${suffix}${isPending ? ' (PENDING)' : ''}`, 45, nextY + 31);
       } else {
         doc.setTextColor(100, 100, 100);
         doc.text('BALANCE:', 14, nextY + 31);
         doc.setFont('', 'normal');
-        doc.text(`${symbol}0.00${suffix} (BALANCED)`, 55, nextY + 31);
+        doc.text(isFuel ? `0 L (BALANCED)` : `${symbol}0.00${suffix} (BALANCED)`, 45, nextY + 31);
       }
       doc.setTextColor(26, 26, 26);
 

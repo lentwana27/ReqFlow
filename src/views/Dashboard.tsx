@@ -115,9 +115,9 @@ export default function Dashboard({ userProfile }: DashboardProps) {
         return false;
       }
     } else if (tab === 'RETURNS') {
-      const hasPendingReturn = req.returnStatus === 'pending';
-      const hasChangeDue = req.status === 'processed' && req.changeReturned && req.changeReturned > 0 && (req.returnStatus === 'none' || !req.returnStatus);
-      if (!hasPendingReturn && !hasChangeDue) return false;
+      const hasChangeDue = req.status === 'processed' && ((req.changeReturned && req.changeReturned > 0) || (req.amountToReturn && req.amountToReturn > 0));
+      const hasReturnStatus = req.returnStatus && req.returnStatus !== 'none';
+      if (!hasChangeDue && !hasReturnStatus && !req.amountToReturn) return false;
     } else if (tab === 'MY') {
       if (req.creatorId !== userProfile.uid) return false;
     }
@@ -402,7 +402,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
               onClick={() => setTab('RETURNS')}
               className={`text-xs font-bold uppercase tracking-wider pb-4 border-b-2 transition-all flex items-center gap-2 ${tab === 'RETURNS' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
             >
-              Funds Returns ({requisitions.filter(r => r.returnStatus === 'pending' || (r.status === 'processed' && r.changeReturned && r.changeReturned > 0 && (!r.returnStatus || r.returnStatus === 'none'))).length})
+              Funds Returns ({requisitions.filter(r => (r.status === 'processed' && ((r.changeReturned && r.changeReturned > 0) || (r.amountToReturn && r.amountToReturn > 0))) || (r.returnStatus && r.returnStatus !== 'none')).length})
               {requisitions.some(r => r.returnStatus === 'pending') && <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />}
             </button>
           )}
@@ -553,13 +553,35 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                         </td>
                     <td className="px-6 py-4 font-mono text-xs font-bold text-right">
                       {req.type === RequisitionType.FUEL ? (
-                        <span className="text-blue-600">{req.items.reduce((sum, item) => sum + (item.qty || 0), 0)} L</span>
+                        <div className="flex flex-col items-end">
+                          <span className="text-blue-600">{req.items.reduce((sum, item) => sum + (item.qty || 0), 0)} L</span>
+                          {req.status === 'processed' && req.amountIssued !== undefined && (
+                            <span className="text-[10px] text-green-600 mt-1">Issued: {req.amountIssued} L</span>
+                          )}
+                          {(req.amountToReturn && req.amountToReturn > 0) || (req.changeReturned && req.changeReturned > 0) ? (
+                            <span className={`text-[10px] mt-0.5 px-1 rounded-sm ${req.returnStatus === 'confirmed' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                              {req.returnStatus === 'confirmed' ? 'Returned' : 'Owing'}: {(req.amountToReturn || req.changeReturned || 0)} L
+                            </span>
+                          ) : null}
+                        </div>
                       ) : (
-                        <>
-                          {req.currency === Currency.USD || !req.currency ? '$' : ''}
-                          {req.totalAmount.toFixed(2)}
-                          {req.currency && req.currency !== Currency.USD ? ` ${req.currency}` : ''}
-                        </>
+                        <div className="flex flex-col items-end">
+                          <span className="text-gray-900">
+                            {req.currency === Currency.USD || !req.currency ? '$' : ''}
+                            {req.totalAmount.toFixed(2)}
+                            {req.currency && req.currency !== Currency.USD ? ` ${req.currency}` : ''}
+                          </span>
+                          {req.status === 'processed' && req.amountIssued !== undefined && (
+                            <span className="text-[10px] text-green-600 mt-1">
+                              Issued: {req.currency === Currency.USD || !req.currency ? '$' : ''}{req.amountIssued.toFixed(2)}{req.currency && req.currency !== Currency.USD ? ` ${req.currency}` : ''}
+                            </span>
+                          )}
+                          {(req.amountToReturn && req.amountToReturn > 0) || (req.changeReturned && req.changeReturned > 0) ? (
+                            <span className={`text-[10px] mt-0.5 px-1 rounded-sm ${req.returnStatus === 'confirmed' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                              {req.returnStatus === 'confirmed' ? 'Returned' : 'Owing'}: {req.currency === Currency.USD || !req.currency ? '$' : ''}{(req.amountToReturn || req.changeReturned || 0).toFixed(2)}{req.currency && req.currency !== Currency.USD ? ` ${req.currency}` : ''}
+                            </span>
+                          ) : null}
+                        </div>
                       )}
                     </td>
                       </>
@@ -750,6 +772,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           <RequisitionForm 
             userDept={userProfile.department}
             userEmail={userProfile.username || userProfile.email}
+            userProfile={userProfile}
             initialData={editingReq || undefined}
             fixedType={editingReq ? undefined : (selectedType || undefined)}
             onClose={() => {

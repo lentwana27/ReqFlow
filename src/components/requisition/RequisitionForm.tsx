@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Plus, Trash2, X, Loader2, Paperclip, FileText, Image as ImageIcon, FileIcon, Eye, ArrowLeft } from 'lucide-react';
 import { RequisitionType, RequisitionItem, Department, REQUISITION_WORKFLOWS, UserRole, Attachment, Currency, Requisition } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { checkRoleMatch } from '../../lib/roleUtils';
 
 interface RequisitionFormProps {
   onClose: () => void;
@@ -10,9 +11,10 @@ interface RequisitionFormProps {
   userEmail: string;
   initialData?: Requisition;
   fixedType?: RequisitionType;
+  userProfile?: import('../../types').UserProfile;
 }
 
-export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail, initialData, fixedType }: RequisitionFormProps) {
+export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail, initialData, fixedType, userProfile }: RequisitionFormProps) {
   const [type, setType] = useState<RequisitionType>(fixedType || initialData?.type || RequisitionType.ADMIN);
   const [currency, setCurrency] = useState<Currency>(initialData?.currency || Currency.USD);
   const [notes, setNotes] = useState(initialData?.notes || '');
@@ -152,12 +154,59 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
         return role;
       });
 
-      const initialApprovals = workflowStages.map(role => ({
-        role,
-        status: 'pending' as const,
-      }));
+      let currentStage = 0;
+      let finalStatus = 'pending';
 
-      const isAutoApproved = workflowStages.length === 0;
+      const initialApprovals: any[] = workflowStages.map((role) => {
+        return {
+          role,
+          status: 'pending',
+        };
+      });
+
+      // Auto-approve if the creator's role matches the required role for the first stage(s)
+      if (userProfile && !initialData) {
+        for (let i = 0; i < initialApprovals.length; i++) {
+          if (checkRoleMatch(userProfile, initialApprovals[i].role, userDept)) {
+            // Auto-approve this stage
+            initialApprovals[i].status = 'approved';
+            (initialApprovals[i] as any).approverId = userProfile.uid;
+            (initialApprovals[i] as any).approverName = userProfile.name;
+            (initialApprovals[i] as any).signatureId = `SIG-SYSTEM-AUTO-${Date.now()}`;
+            (initialApprovals[i] as any).timestamp = new Date().toISOString();
+            (initialApprovals[i] as any).comment = 'Auto-approved by creator';
+            currentStage = i + 1;
+          } else {
+            // Stop at first non-matching stage
+            break;
+          }
+        }
+      } else if (initialData) {
+         // for edit, we might want to keep the current auto approvals?
+         // No, the instruction is when they create, it automatically approves. On resubmit it goes back to stage 0, but we can let them auto-approve again.
+         // Actually wait. On resubmit (edit), the requisition goes back to pending. Let's auto-approve again if it matches.
+        if (userProfile) {
+          for (let i = 0; i < initialApprovals.length; i++) {
+            if (checkRoleMatch(userProfile, initialApprovals[i].role, userDept)) {
+              initialApprovals[i].status = 'approved';
+              (initialApprovals[i] as any).approverId = userProfile.uid;
+              (initialApprovals[i] as any).approverName = userProfile.name;
+              (initialApprovals[i] as any).signatureId = `SIG-SYSTEM-AUTO-${Date.now()}`;
+              (initialApprovals[i] as any).timestamp = new Date().toISOString();
+              (initialApprovals[i] as any).comment = 'Auto-approved by creator on resubmit';
+              currentStage = i + 1;
+            } else {
+              break;
+            }
+          }
+        }
+      }
+
+      if (currentStage >= initialApprovals.length) {
+        finalStatus = 'approved';
+      } else {
+        finalStatus = 'pending';
+      }
 
       const submissionData: any = {
         type,
@@ -168,8 +217,8 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
         items,
         totalAmount,
         approvals: initialApprovals,
-        status: isAutoApproved ? 'approved' : 'pending',
-        currentStage: 0,
+        status: workflowStages.length === 0 ? 'approved' : finalStatus,
+        currentStage: currentStage,
         department: userDept,
         attachments,
         notes,
