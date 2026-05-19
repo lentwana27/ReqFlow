@@ -51,7 +51,8 @@ export default function Dashboard({ userProfile }: DashboardProps) {
             const isApprover = r.status === 'pending' && currentApproval && checkRoleMatch(userProfile, currentApproval.role, r.department) && userProfile.isVerified;
             const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
             const isTreasurerReturn = userProfile.role === UserRole.TREASURER && r.returnStatus === 'pending' && userProfile.isVerified;
-            return isApprover || isProcessor || isTreasurerReturn;
+            const isFueler = userProfile.role === UserRole.FUELER && r.status === 'processed' && r.type === RequisitionType.FUEL && userProfile.isVerified;
+            return isApprover || isProcessor || isTreasurerReturn || isFueler;
           });
           if (needsApproval.length > 0 && tab === 'ALL') {
             // Only auto-switch once? Or just leave it for now.
@@ -110,8 +111,9 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       const isApprover = req.status === 'pending' && currentApproval && checkRoleMatch(userProfile, currentApproval.role, req.department) && userProfile.isVerified;
       const isProcessor = req.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
       const isTreasurerReturn = userProfile.role === UserRole.TREASURER && req.returnStatus === 'pending' && userProfile.isVerified;
+      const isFueler = userProfile.role === UserRole.FUELER && req.status === 'processed' && req.type === RequisitionType.FUEL && userProfile.isVerified;
       
-      if (!isApprover && !isProcessor && !isTreasurerReturn) {
+      if (!isApprover && !isProcessor && !isTreasurerReturn && !isFueler) {
         return false;
       }
     } else if (tab === 'RETURNS') {
@@ -295,6 +297,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
     switch(status) {
       case 'approved': return 'bg-blue-100 text-blue-700';
       case 'processed': return 'bg-green-100 text-green-700';
+      case 'completed': return 'bg-emerald-100 text-emerald-800';
       case 'rejected': return 'bg-red-100 text-red-700';
       default: return 'bg-yellow-100 text-yellow-700';
     }
@@ -308,7 +311,8 @@ export default function Dashboard({ userProfile }: DashboardProps) {
         const isApprover = r.status === 'pending' && currentApproval && checkRoleMatch(userProfile, currentApproval.role, r.department) && userProfile.isVerified;
         const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
         const isTreasurerReturn = userProfile.role === UserRole.TREASURER && r.returnStatus === 'pending' && userProfile.isVerified;
-        return isApprover || isProcessor || isTreasurerReturn;
+        const isFueler = userProfile.role === UserRole.FUELER && r.status === 'processed' && r.type === RequisitionType.FUEL && userProfile.isVerified;
+        return isApprover || isProcessor || isTreasurerReturn || isFueler;
       }).length, 
       icon: Clock, 
       color: 'text-amber-600' 
@@ -343,13 +347,15 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tighter">Inventory & Requisitions</h2>
           <p className="text-gray-500 text-sm mt-1">Manage and track your digital requisition workflow.</p>
         </div>
-        <button 
-          id="new-req-btn"
-          onClick={() => setShowTypeSelector(true)}
-          className="w-full sm:w-auto btn-primary flex items-center gap-2 h-12 px-6 justify-center"
-        >
-          <Plus className="w-4 h-4" /> Write Requisition
-        </button>
+        {userProfile.role !== UserRole.FUELER && (
+          <button 
+            id="new-req-btn"
+            onClick={() => setShowTypeSelector(true)}
+            className="w-full sm:w-auto btn-primary flex items-center gap-2 h-12 px-6 justify-center"
+          >
+            <Plus className="w-4 h-4" /> Write Requisition
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -381,14 +387,16 @@ export default function Dashboard({ userProfile }: DashboardProps) {
               const isApprover = r.status === 'pending' && currentApproval && checkRoleMatch(userProfile, currentApproval.role, r.department) && userProfile.isVerified;
               const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
               const isTreasurerReturn = userProfile.role === UserRole.TREASURER && r.returnStatus === 'pending' && userProfile.isVerified;
-              return isApprover || isProcessor || isTreasurerReturn;
+              const isFueler = userProfile.role === UserRole.FUELER && r.status === 'processed' && r.type === RequisitionType.FUEL && userProfile.isVerified;
+              return isApprover || isProcessor || isTreasurerReturn || isFueler;
             }).length})
             {requisitions.some(r => {
               const currentApproval = r.approvals[r.currentStage];
               const isApprover = r.status === 'pending' && currentApproval && checkRoleMatch(userProfile, currentApproval.role, r.department) && userProfile.isVerified;
               const isProcessor = r.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
               const isTreasurerReturn = userProfile.role === UserRole.TREASURER && r.returnStatus === 'pending' && userProfile.isVerified;
-              return isApprover || isProcessor || isTreasurerReturn;
+              const isFueler = userProfile.role === UserRole.FUELER && r.status === 'processed' && r.type === RequisitionType.FUEL && userProfile.isVerified;
+              return isApprover || isProcessor || isTreasurerReturn || isFueler;
             }) && <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />}
           </button>
           <button 
@@ -505,7 +513,8 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                 const isApprover = req.status === 'pending' && currentApproval && checkRoleMatch(userProfile, currentApproval.role, req.department) && userProfile.isVerified;
                 const isProcessor = req.status === 'approved' && (userProfile.role === UserRole.TREASURER || userProfile.role === UserRole.FINANCE_HOD) && userProfile.isVerified;
                 const isTreasurerReturn = userProfile.role === UserRole.TREASURER && req.returnStatus === 'pending' && userProfile.isVerified;
-                const needsMyAction = isApprover || isProcessor || isTreasurerReturn;
+                const isFueler = userProfile.role === UserRole.FUELER && req.status === 'processed' && req.type === RequisitionType.FUEL && userProfile.isVerified;
+                const needsMyAction = isApprover || isProcessor || isTreasurerReturn || isFueler;
                 
                 // For QR types, we show the first item's details in the table if filtered
                 const firstItem = req.items[0] || { code: '-', description: '-', qty: 0 };

@@ -356,6 +356,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
 
   const userRole = userProfile?.role as string;
   const isTreasurer = userRole === UserRole.TREASURER || userRole === 'Treasurer' || userRole === 'TREASURER';
+  const isFueler = userRole === UserRole.FUELER;
 
   const typesEligibleForReturn = [
     RequisitionType.ADMIN,
@@ -377,6 +378,8 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                            requisition.returnStatus === 'pending';
 
   const canProcess = isTreasurer && requisition.status === 'approved';
+  
+  const canCompleteFuel = isFueler && requisition.status === 'processed' && requisition.type === RequisitionType.FUEL;
 
   const currency = requisition.currency || Currency.USD;
   const symbol = currency === Currency.USD ? '$' : '';
@@ -873,6 +876,49 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                   <ArrowRight className="w-4 h-4" />
                 )}
                 {isProcessing === 'processed' ? 'Disbursing...' : isSuccess ? 'Processed!' : 'Disburse & Mark Processed'}
+              </button>
+            </div>
+          )}
+
+          {canCompleteFuel && (
+            <div className="space-y-4 pt-4 border-t border-gray-200">
+              <div className="bg-green-50 border border-green-100 p-4 rounded-sm">
+                <p className="text-xs text-green-700 font-medium flex items-center gap-2">
+                  <Check className="w-4 h-4" /> Fuel has been issued by Treasurer. Ready to complete.
+                </p>
+              </div>
+              <button 
+                onClick={async () => {
+                  try {
+                    setIsProcessing('processed');
+                    await requisitionService.update(requisition.id, {
+                      status: 'completed',
+                      updatedAt: new Date().toISOString()
+                    });
+                    setIsSuccess(true);
+                    showToast('Fuel Requisition marked as completed', 'success');
+                    setTimeout(() => {
+                      onClose();
+                    }, 1000);
+                  } catch (err) {
+                    showToast('Failed to complete requisition', 'error');
+                  } finally {
+                    setIsProcessing(null);
+                  }
+                }}
+                disabled={!!isProcessing || isSuccess}
+                className={`w-full btn-primary border-none flex items-center justify-center gap-2 h-12 transition-all duration-300 ${
+                  isSuccess ? 'bg-green-600' : 'bg-green-700 hover:bg-green-800'
+                } disabled:opacity-80 text-white`}
+              >
+                {isProcessing === 'processed' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isSuccess ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  <Check className="w-4 h-4" />
+                )}
+                {isProcessing === 'processed' ? 'Completing...' : isSuccess ? 'Completed!' : 'Mark as Completed'}
               </button>
             </div>
           )}

@@ -31,7 +31,8 @@ export enum UserRole {
   SHOP_HOD = 'Shop Head of Department',
   IT_HOD = 'IT HOD',
   WAREHOUSE_HOD = 'Warehouse HOD',
-  TREASURER = 'Treasurer'
+  TREASURER = 'Treasurer',
+  FUELER = 'Fueler'
 }
 
 export enum Department {
@@ -48,7 +49,8 @@ export enum Department {
   AUDIT = 'Audit',
   FINANCE = 'Finance',
   ADMINISTRATION = 'Administration',
-  MARKETING = 'Marketing'
+  MARKETING = 'Marketing',
+  GARAGE = 'Garage'
 }
 
 export interface RequisitionItem {
@@ -107,7 +109,7 @@ export interface Requisition {
   quotationBook: string;
   currency?: Currency;
   totalAmount: number;
-  status: 'pending' | 'approved' | 'rejected' | 'processed';
+  status: 'pending' | 'approved' | 'rejected' | 'processed' | 'completed';
   currentStage: number;
   involvedRoles: string[];
   approvals: Approval[];
