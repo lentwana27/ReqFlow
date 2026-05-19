@@ -602,6 +602,9 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                       } else if (t === RequisitionType.FINANCE) {
                         isAllowed = userDept === Department.FINANCE || userDept === Department.ADMINISTRATION;
                         restrictionMsg = 'Finance/Admin Only';
+                      } else if (t === RequisitionType.MARKETING) {
+                        isAllowed = userDept === Department.MARKETING;
+                        restrictionMsg = 'Marketing Dept Only';
                       }
                       
                       return (
