@@ -481,7 +481,7 @@ export const requisitionService = {
         if (!userProfile.isVerified) return false;
 
         const isFueler = userProfile.role === UserRole.FUELER;
-        if (isFueler && req.type === RequisitionType.FUEL && (req.status === 'processed' || req.status === 'completed')) return true;
+        if (isFueler && req.type === RequisitionType.FUEL && (req.status === 'approved' || req.status === 'processed' || req.status === 'completed')) return true;
         
         const isApproverInChain = req.approvals.some(approval => {
           if (approval.role === userProfile.role) return true;
