@@ -530,26 +530,20 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                   </p>
                 </div>
               )}
-              {requisition.changeReturned !== undefined && requisition.changeReturned > 0 && (
-                <div className={`p-4 border rounded-sm transition-all duration-500 ${
-                  requisition.returnStatus === 'none' || !requisition.returnStatus 
-                  ? 'bg-amber-100 border-amber-400 animate-pulse shadow-md ring-2 ring-amber-500/20' 
-                  : 'bg-amber-50 border-amber-100'
-                }`}>
+              {requisition.changeReturned !== undefined && requisition.changeReturned > 0 && (requisition.returnStatus === 'none' || !requisition.returnStatus) && (
+                <div className={`p-4 border rounded-sm transition-all duration-500 bg-amber-100 border-amber-400 animate-pulse shadow-md ring-2 ring-amber-500/20`}>
                   <div className="flex items-center gap-2 mb-1">
-                    <Clock className={`w-4 h-4 ${requisition.returnStatus === 'none' || !requisition.returnStatus ? 'text-amber-700' : 'text-amber-600'}`} />
-                    <label className={`text-[10px] uppercase font-black ${requisition.returnStatus === 'none' || !requisition.returnStatus ? 'text-amber-900' : 'text-amber-600'} block`}>
+                    <Clock className="w-4 h-4 text-amber-700" />
+                    <label className="text-[10px] uppercase font-black text-amber-900 block">
                       Change to be Returned
                     </label>
                   </div>
-                  <p className={`text-xl font-black ${requisition.returnStatus === 'none' || !requisition.returnStatus ? 'text-amber-900' : 'text-amber-800'}`}>
+                  <p className="text-xl font-black text-amber-900">
                     {symbol}{requisition.changeReturned.toFixed(2)}{suffix}
                   </p>
-                  {(requisition.returnStatus === 'none' || !requisition.returnStatus) && (
-                    <p className="text-[10px] font-bold text-amber-700 mt-1 italic">
-                      {requisition.creatorId === userProfile.uid ? '!!! ACTION REQUIRED: RETURN THIS CHANGE TO THE OFFICE !!!' : 'Waiting for creator to return funds'}
-                    </p>
-                  )}
+                  <p className="text-[10px] font-bold text-amber-700 mt-1 italic">
+                    {requisition.creatorId === userProfile.uid ? '!!! ACTION REQUIRED: RETURN THIS CHANGE TO THE OFFICE !!!' : 'Waiting for creator to return funds'}
+                  </p>
                 </div>
               )}
               {requisition.returnStatus && requisition.returnStatus !== 'none' && (
@@ -557,7 +551,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                   <div className="flex items-center gap-2 mb-1">
                     {requisition.returnStatus === 'confirmed' ? <Check className="w-4 h-4 text-green-600" /> : <Clock className="w-4 h-4 text-blue-700" />}
                     <label className={`text-[10px] uppercase font-black ${requisition.returnStatus === 'confirmed' ? 'text-green-600' : 'text-blue-900'} block`}>
-                      Funds Return {requisition.returnStatus === 'confirmed' ? '(CONFIRMED)' : '(PENDING TREASURER ACTION)'}
+                      {requisition.returnType === 'change' ? 'Change Return' : 'Funds Return'} {requisition.returnStatus === 'confirmed' ? '(CONFIRMED)' : '(PENDING TREASURER ACTION)'}
                     </label>
                   </div>
                   <p className={`text-xl font-black ${requisition.returnStatus === 'confirmed' ? 'text-green-800' : 'text-blue-900'}`}>
@@ -975,12 +969,17 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
               <button 
                 onClick={async () => {
                   try {
-                    await handleUpdateStatus('processed', false, 'Funds Receipt Confirmed', {
-                      returnStatus: 'confirmed'
+                    setIsProcessing('processed');
+                    await requisitionService.update(requisition.id, {
+                      returnStatus: 'confirmed',
+                      updatedAt: new Date().toISOString()
                     });
                     showToast('Funds return confirmed', 'success');
+                    onClose();
                   } catch (err) {
                     showToast('Failed to confirm return', 'error');
+                  } finally {
+                    setIsProcessing(null);
                   }
                 }}
                 disabled={!!isProcessing || isSuccess}

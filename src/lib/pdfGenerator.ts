@@ -391,6 +391,29 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
     }
   }
 
+  // Add a line for the receiver to sign
+  let signatureY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 30 : 200;
+  if (requisition.status === 'processed' && requisition.issuedInfo) {
+    signatureY += 35; // push it further down if disbursement section is present
+  }
+  
+  if (signatureY + 30 > pageHeight - 30) {
+    doc.addPage();
+    signatureY = 40;
+  }
+
+  doc.setDrawColor(150, 150, 150);
+  doc.setLineWidth(0.5);
+  doc.line(14, signatureY, 80, signatureY);
+  
+  doc.setFont('', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(26, 26, 26);
+  doc.text('Receiver (Name & Signature)', 14, signatureY + 5);
+
+  doc.line(pageWidth - 80, signatureY, pageWidth - 14, signatureY);
+  doc.text('Date', pageWidth - 80, signatureY + 5);
+
   // Footer / Verification note
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);

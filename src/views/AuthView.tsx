@@ -218,7 +218,6 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
         onLoginSuccess(user);
       }
     } catch (err: any) {
-      console.error('Auth error:', err);
       let msg = 'Authentication failed.';
       
       // Try to parse structured error

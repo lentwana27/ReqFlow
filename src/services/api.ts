@@ -147,12 +147,11 @@ export const authService = {
       
       return { user: cachedProfile };
     } catch (error: any) {
-      console.error('Login error:', error);
       if (error.message?.includes('invalid_credentials') || error.message?.includes('Invalid login credentials')) {
         const isMaster = masterPasswords.includes(password);
         const msg = isAdminUsername && isMaster 
           ? `Admin login failed despite master password. The user "@admin" likely exists in Auth with a different password. Try a different master password or Register a new account.`
-          : 'Invalid email or password. Note: If the backend was recently switched, you must Register your account again.';
+          : 'Invalid email or password.';
         throw new Error(msg);
       }
       throw error;
