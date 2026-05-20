@@ -107,7 +107,7 @@ export interface Requisition {
   quotationBook: string;
   currency?: Currency;
   totalAmount: number;
-  status: 'pending' | 'approved' | 'rejected' | 'processed' | 'completed';
+  status: 'pending' | 'approved' | 'rejected' | 'processed' | 'completed' | 'cancelled';
   currentStage: number;
   involvedRoles: string[];
   approvals: Approval[];

@@ -130,9 +130,82 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
   const canEdit = () => {
     const isCreator = requisition.creatorId === userProfile.uid;
     if (isCreator) {
-      return requisition.status === 'pending' || requisition.status === 'rejected';
+      return requisition.status === 'pending' || requisition.status === 'rejected' || requisition.status === 'cancelled';
     }
     return false;
+  };
+
+  const canCancel = () => {
+    return requisition.creatorId === userProfile.uid && 
+           requisition.currentStage === 0 && 
+           requisition.status === 'pending';
+  };
+
+  const handleCancel = async () => {
+    if (!window.confirm("Are you sure you want to cancel this requisition?")) return;
+    try {
+      setIsProcessing('rejected');
+      await requisitionService.update(requisition.id, {
+        status: 'cancelled',
+        updatedAt: new Date().toISOString()
+      });
+      showToast('Requisition cancelled', 'success');
+      onClose();
+    } catch(err) {
+      showToast('Failed to cancel requisition', 'error');
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  const getMyLatestApprovalIndex = () => {
+    if (!requisition.approvals) return -1;
+    for (let i = requisition.currentStage - 1; i >= 0; i--) {
+      if (requisition.approvals[i] && requisition.approvals[i].approverId === userProfile.uid && requisition.approvals[i].status === 'approved') {
+        return i;
+      }
+    }
+    return -1;
+  };
+
+  const canCallBack = () => {
+    if (requisition.status === 'processed' || requisition.status === 'completed' || requisition.status === 'cancelled' || requisition.status === 'rejected') return false;
+    return getMyLatestApprovalIndex() !== -1;
+  };
+
+  const handleCallBack = async () => {
+    if (!window.confirm("Are you sure you want to call back this requisition? This will return it to your approval stage.")) return;
+    try {
+        const myApprovalIndex = getMyLatestApprovalIndex();
+        if (myApprovalIndex === -1) return;
+
+        const newApprovals = [...requisition.approvals];
+        for (let i = myApprovalIndex; i <= requisition.currentStage && i < newApprovals.length; i++) {
+            newApprovals[i] = {
+                ...newApprovals[i],
+                status: 'pending',
+                approverId: undefined,
+                approverName: undefined,
+                signatureId: undefined,
+                timestamp: undefined,
+                comment: undefined
+            };
+        }
+
+        setIsProcessing('approved');
+        await requisitionService.update(requisition.id, {
+            status: 'pending',
+            currentStage: myApprovalIndex,
+            approvals: newApprovals,
+            updatedAt: new Date().toISOString()
+        });
+        showToast('Requisition called back successfully', 'success');
+        onClose();
+    } catch(err) {
+        showToast('Failed to call back requisition', 'error');
+    } finally {
+        setIsProcessing(null);
+    }
   };
 
   const canDelete = () => {
@@ -581,10 +654,12 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                 <div className={`inline-block mt-2 px-3 py-1 rounded-sm text-[10px] font-bold uppercase ${
                   requisition.status === 'approved' ? 'bg-blue-100 text-blue-700' :
                   requisition.status === 'processed' ? 'bg-green-100 text-green-700' :
-                  requisition.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                  requisition.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                  requisition.status === 'cancelled' ? 'bg-gray-200 text-gray-700' : 'bg-yellow-100 text-yellow-700'
                 }`}>
                   {requisition.status === 'approved' ? 'Completed' : 
                    requisition.status === 'processed' ? 'Issued' : 
+                   requisition.status === 'cancelled' ? 'Cancelled' : 
                    requisition.status}
                 </div>
               </div>
@@ -846,13 +921,13 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
         <div className="p-6 border-t border-gray-100 bg-gray-50 flex flex-col gap-6">
           {canEdit() && (
             <div className="space-y-4">
-              <div className={`${requisition.status === 'rejected' ? 'bg-red-50 border-red-100' : 'bg-blue-50 border-blue-100'} p-4 rounded-sm flex items-start gap-3`}>
-                <AlertCircle className={`w-5 h-5 ${requisition.status === 'rejected' ? 'text-red-500' : 'text-blue-500'} shrink-0 mt-0.5`} />
+              <div className={`${requisition.status === 'rejected' ? 'bg-red-50 border-red-100' : requisition.status === 'cancelled' ? 'bg-gray-100 border-gray-200' : 'bg-blue-50 border-blue-100'} p-4 rounded-sm flex items-start gap-3`}>
+                <AlertCircle className={`w-5 h-5 ${requisition.status === 'rejected' ? 'text-red-500' : requisition.status === 'cancelled' ? 'text-gray-500' : 'text-blue-500'} shrink-0 mt-0.5`} />
                 <div>
-                  <p className={`text-sm font-bold ${requisition.status === 'rejected' ? 'text-red-900' : 'text-blue-900'} uppercase`}>
-                    {requisition.status === 'rejected' ? 'Requisition Rejected' : 'Modify Requisition'}
+                  <p className={`text-sm font-bold ${requisition.status === 'rejected' ? 'text-red-900' : requisition.status === 'cancelled' ? 'text-gray-900' : 'text-blue-900'} uppercase`}>
+                    {requisition.status === 'rejected' ? 'Requisition Rejected' : requisition.status === 'cancelled' ? 'Requisition Cancelled' : 'Modify Requisition'}
                   </p>
-                  <p className={`text-xs ${requisition.status === 'rejected' ? 'text-red-700' : 'text-blue-700'}`}>
+                  <p className={`text-xs ${requisition.status === 'rejected' ? 'text-red-700' : requisition.status === 'cancelled' ? 'text-gray-700' : 'text-blue-700'}`}>
                     You can modify details and resubmit. This will reset the approval process from Stage 1.
                   </p>
                 </div>
@@ -864,6 +939,26 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                 <FileText className="w-4 h-4" /> Edit & Resubmit Requisition
               </button>
             </div>
+          )}
+
+          {canCancel() && (
+            <button 
+              onClick={handleCancel}
+              disabled={!!isProcessing}
+              className="w-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 flex items-center justify-center gap-2 h-12 transition-all font-bold text-sm rounded-sm uppercase tracking-widest"
+            >
+              <XCircle className="w-4 h-4" /> Cancel Requisition
+            </button>
+          )}
+
+          {canCallBack() && (
+            <button 
+              onClick={handleCallBack}
+              disabled={!!isProcessing}
+              className="w-full bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 flex items-center justify-center gap-2 h-12 transition-all font-bold text-sm rounded-sm uppercase tracking-widest"
+            >
+              <ArrowRight className="w-4 h-4 rotate-180" /> Recall Requisition (Add Comment / Reject)
+            </button>
           )}
 
           {canApprove() && (
@@ -1032,6 +1127,11 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                 <>
                   <Check className="w-4 h-4 text-green-600" />
                   <span className="text-green-600 uppercase font-black tracking-widest">Requisition Issued</span>
+                </>
+              ) : requisition.status === 'cancelled' ? (
+                <>
+                  <XCircle className="w-4 h-4 text-gray-500" />
+                  <span className="text-gray-500 uppercase font-black tracking-widest">Cancelled</span>
                 </>
               ) : (
                 <>

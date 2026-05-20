@@ -297,6 +297,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       case 'processed': return 'bg-green-100 text-green-700';
       case 'completed': return 'bg-emerald-100 text-emerald-800';
       case 'rejected': return 'bg-red-100 text-red-700';
+      case 'cancelled': return 'bg-gray-200 text-gray-700';
       default: return 'bg-yellow-100 text-yellow-700';
     }
   };
@@ -590,6 +591,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                         <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-sm ${getStatusColor(req.status)}`}>
                           {req.status === 'approved' ? 'Completed' : 
                            req.status === 'processed' ? 'Issued' : 
+                           req.status === 'cancelled' ? 'Cancelled' : 
                            req.status}
                         </span>
                         {req.returnStatus === 'pending' && (
