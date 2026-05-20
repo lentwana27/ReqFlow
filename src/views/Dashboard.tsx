@@ -738,7 +738,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                   let isAllowed = true;
                   let restrictionMsg = '';
 
-                  if (t === RequisitionType.PURCHASING || t === RequisitionType.PROJECTS) {
+                  if (t === RequisitionType.PURCHASING || t === RequisitionType.PROJECTS || t === RequisitionType.CASH) {
                     isAllowed = userProfile.department === Department.PURCHASING;
                     restrictionMsg = 'Purchasing Dept Only';
                   } else if (t === RequisitionType.IT) {

@@ -14,7 +14,8 @@ export enum RequisitionType {
   QUOTATIONS = 'Quotations',
   FUEL = 'Fuel',
   FINANCE = 'Finance Requisition',
-  MARKETING = 'Marketing'
+  MARKETING = 'Marketing',
+  CASH = 'Cash Requisition'
 }
 
 export enum UserRole {
@@ -209,8 +210,8 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
     UserRole.DIRECTOR
   ],
   [RequisitionType.CAR_MAINTENANCE]: [
-    UserRole.FINANCE_HOD,
-    UserRole.DIRECTOR
+    UserRole.DIRECTOR,
+    UserRole.FINANCE_HOD
   ],
   [RequisitionType.FUEL]: [
     UserRole.FINANCE_HOD
@@ -224,7 +225,12 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
     UserRole.FINANCE_HOD,
     UserRole.DIRECTOR
   ],
-  [RequisitionType.QUOTATIONS]: []
+  [RequisitionType.QUOTATIONS]: [],
+  [RequisitionType.CASH]: [
+    UserRole.PURCHASING_HOD,
+    UserRole.FINANCE_HOD,
+    UserRole.DIRECTOR
+  ]
 };
 
 export const DEPARTMENTS = Object.values(Department);
