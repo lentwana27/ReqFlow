@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { requisitionService, auditService } from '../../services/api';
 import { Requisition, UserProfile, UserRole, Department, RequisitionType, Attachment, Currency } from '../../types';
-import { X, Check, XCircle, Clock, ArrowRight, Shield, Download, Loader2, AlertCircle, Lock, Paperclip, Eye, FileText, Image as ImageIcon } from 'lucide-react';
+import { X, Check, XCircle, Clock, ArrowRight, Shield, Download, Loader2, AlertCircle, Lock, Paperclip, Eye, FileText, Image as ImageIcon, Plus } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -30,6 +30,9 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
   const [returnTypeSelection, setReturnTypeSelection] = useState<'funds' | 'change'>('funds');
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [localAttachments, setLocalAttachments] = useState<Attachment[]>(requisition.attachments || []);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -69,6 +72,60 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
       repairInvolvedRoles();
     }
   }, [requisition.id, userProfile]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    setIsUploading(true);
+    const newAttachments: Attachment[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.size > 2 * 1024 * 1024) {
+          alert(`File ${file.name} is too large. Max size is 2MB.`);
+          continue;
+        }
+
+        const reader = new FileReader();
+        const promise = new Promise<Attachment>((resolve) => {
+          reader.onload = (event) => {
+            resolve({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              url: event.target?.result as string
+            });
+          };
+        });
+        reader.readAsDataURL(file);
+        newAttachments.push(await promise);
+    }
+
+    const updated = [...localAttachments, ...newAttachments];
+    setLocalAttachments(updated);
+    
+    try {
+        await requisitionService.update(requisition.id, { attachments: updated });
+        showToast('Attachments updated successfully', 'success');
+    } catch(err) {
+        showToast('Failed to update attachments in database', 'error');
+    }
+    setIsUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeAttachment = async (index: number) => {
+    if (!window.confirm("Are you sure you want to delete this attachment?")) return;
+    const updated = localAttachments.filter((_, i) => i !== index);
+    setLocalAttachments(updated);
+    try {
+        await requisitionService.update(requisition.id, { attachments: updated });
+        showToast('Attachment deleted successfully', 'success');
+    } catch(err) {
+        showToast('Failed to update attachments in database', 'error');
+    }
+  };
 
   const canEdit = () => {
     const isCreator = requisition.creatorId === userProfile.uid;
@@ -603,15 +660,35 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
             </div>
           </div>
 
-          {requisition.attachments && requisition.attachments.length > 0 && (
+          {(localAttachments.length > 0 || canEdit()) && (
             <div className="space-y-4">
-              <label className="input-label flex items-center gap-2">
-                <Paperclip className="w-4 h-4" /> 
-                Attachments
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="input-label flex items-center gap-2">
+                  <Paperclip className="w-4 h-4" /> 
+                  Attachments
+                  {isUploading && <Loader2 className="w-3 h-3 animate-spin text-blue-500" />}
+                </label>
+                {canEdit() && (
+                  <div>
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-sm"
+                    >
+                      <Plus className="w-3 h-3" /> Add File
+                    </button>
+                    <input 
+                      type="file"
+                      className="hidden"
+                      multiple
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                    />
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-3">
-                {requisition.attachments.map((file, idx) => (
-                  <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-sm">
+                {localAttachments.map((file, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-sm group relative">
                     <div className="w-8 h-8 rounded-sm bg-white border border-gray-200 flex items-center justify-center shrink-0">
                       {file.type.startsWith('image/') ? <ImageIcon className="w-4 h-4 text-blue-500" /> : <FileText className="w-4 h-4 text-gray-500" />}
                     </div>
@@ -619,21 +696,32 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                       <p className="text-[11px] font-bold text-gray-700 truncate">{file.name}</p>
                       <p className="text-[9px] text-gray-400">{(file.size / 1024).toFixed(1)} KB</p>
                     </div>
-                    <a 
-                      href={file.url} 
-                      download={file.name}
-                      className="p-1.5 hover:bg-white hover:shadow-sm rounded-full transition-all text-gray-400 hover:text-black"
-                      title="Download Attachment"
-                    >
-                      <Download className="w-4 h-4" />
-                    </a>
-                    {file.type.startsWith('image/') && (
-                      <button 
-                        onClick={() => window.open(file.url, '_blank')}
+                    <div className="flex items-center gap-1 relative z-10">
+                      <a 
+                        href={file.url} 
+                        download={file.name}
                         className="p-1.5 hover:bg-white hover:shadow-sm rounded-full transition-all text-gray-400 hover:text-black"
-                        title="View Full Image"
+                        title="Download Attachment"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Download className="w-4 h-4" />
+                      </a>
+                      {file.type.startsWith('image/') && (
+                        <button 
+                          onClick={() => window.open(file.url, '_blank')}
+                          className="p-1.5 hover:bg-white hover:shadow-sm rounded-full transition-all text-gray-400 hover:text-black"
+                          title="View Full Image"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    {canEdit() && (
+                      <button
+                        onClick={() => removeAttachment(idx)}
+                        className="absolute -top-2 -right-2 p-1 bg-white border border-gray-200 hover:border-red-200 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-all z-20"
+                        title="Delete Attachment"
+                      >
+                        <X className="w-3 h-3" />
                       </button>
                     )}
                   </div>
