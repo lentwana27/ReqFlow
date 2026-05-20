@@ -29,7 +29,7 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
   const isWrittenToRequired = type !== RequisitionType.SHOP_USE && type !== RequisitionType.WAREHOUSE && type !== RequisitionType.SHOP_QR && type !== RequisitionType.WAREHOUSE_QR;
   const isQuotation = type === RequisitionType.QUOTATIONS;
   const hasCodeColumn = type === RequisitionType.WAREHOUSE || type === RequisitionType.SHOP_USE || type === RequisitionType.SHOP_QR || type === RequisitionType.WAREHOUSE_QR || type === RequisitionType.QUOTATIONS;
-  const hasPricingColumns = type !== RequisitionType.SHOP_QR && type !== RequisitionType.WAREHOUSE_QR && type !== RequisitionType.FUEL;
+  const hasPricingColumns = type !== RequisitionType.SHOP_QR && type !== RequisitionType.WAREHOUSE_QR;
 
   React.useEffect(() => {
     if (!isWrittenToRequired) {
@@ -305,47 +305,27 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                   <thead className="bg-gray-50 border-y border-gray-100">
                     <tr className="text-[10px] uppercase font-bold text-gray-500">
                       <th className="text-left px-4 py-3">Description</th>
-                      {type === RequisitionType.FUEL ? (
-                        <>
-                          <th className="text-center px-4 py-3">Litres</th>
-                          <th className="text-right px-4 py-3">Type</th>
-                        </>
-                      ) : (
-                        <>
-                          <th className="text-center px-4 py-3">Qty</th>
-                          <th className="text-right px-4 py-3">Unit Cost</th>
-                          <th className="text-right px-4 py-3">Total</th>
-                        </>
-                      )}
+                      <th className="text-center px-4 py-3">Qty</th>
+                      <th className="text-right px-4 py-3">Unit Cost</th>
+                      <th className="text-right px-4 py-3">Total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {items.map((item, i) => (
                       <tr key={i}>
                         <td className="px-4 py-3 font-medium">{item.description}</td>
-                        {type === RequisitionType.FUEL ? (
-                          <>
-                            <td className="px-4 py-3 text-center">{item.qty} L</td>
-                            <td className="px-4 py-3 text-right font-bold">{item.fuelType || 'Diesel'}</td>
-                          </>
-                        ) : (
-                          <>
-                            <td className="px-4 py-3 text-center">{item.qty} Units</td>
-                            <td className="px-4 py-3 text-right">{currency === Currency.USD ? '$' : ''}{item.unitCost.toFixed(2)}</td>
-                            <td className="px-4 py-3 text-right font-bold">{currency === Currency.USD ? '$' : ''}{item.totalCost.toFixed(2)}</td>
-                          </>
-                        )}
+                        <td className="px-4 py-3 text-center">{item.qty} Units</td>
+                        <td className="px-4 py-3 text-right">{currency === Currency.USD ? '$' : ''}{item.unitCost.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right font-bold">{currency === Currency.USD ? '$' : ''}{item.totalCost.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
-                  {type !== RequisitionType.FUEL && (
-                    <tfoot className="border-t-2 border-black">
-                      <tr className="font-black text-lg">
-                        <td colSpan={3} className="px-4 py-6 text-right uppercase tracking-tighter">Grand Total ({currency})</td>
-                        <td className="px-4 py-6 text-right">{currency === Currency.USD ? '$' : ''}{totalAmount.toFixed(2)} {currency !== Currency.USD ? currency : ''}</td>
-                      </tr>
-                    </tfoot>
-                  )}
+                  <tfoot className="border-t-2 border-black">
+                    <tr className="font-black text-lg">
+                      <td colSpan={3} className="px-4 py-6 text-right uppercase tracking-tighter">Grand Total ({currency})</td>
+                      <td className="px-4 py-6 text-right">{currency === Currency.USD ? '$' : ''}{totalAmount.toFixed(2)} {currency !== Currency.USD ? currency : ''}</td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
 
@@ -447,12 +427,6 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                         <div className="col-span-7">Description</div>
                         <div className="col-span-2 text-center">Qty</div>
                       </>
-                    ) : type === RequisitionType.FUEL ? (
-                      <>
-                        <div className="col-span-6">Description</div>
-                        <div className="col-span-3 text-center">Litres</div>
-                        <div className="col-span-3 text-right">Type</div>
-                      </>
                     ) : (
                       <>
                         <div className="col-span-6">Description</div>
@@ -464,7 +438,6 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                   </div>
 
                   {items.map((item, idx) => {
-                    const isFuel = type === RequisitionType.FUEL;
                     const isQROnly = (type === RequisitionType.SHOP_QR || type === RequisitionType.WAREHOUSE_QR);
                     
                     return (
@@ -479,15 +452,15 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                             />
                           </div>
                         )}
-                        <div className={hasCodeColumn && hasPricingColumns ? "col-span-5" : isQROnly ? "col-span-7" : isFuel ? "col-span-6" : "col-span-6"}>
+                        <div className={hasCodeColumn && hasPricingColumns ? "col-span-5" : isQROnly ? "col-span-7" : "col-span-6"}>
                           <input 
-                            placeholder={isFuel ? "e.g. For Generator" : "e.g. Printer Paper A4"}
+                            placeholder={"e.g. Printer Paper A4"}
                             className="w-full bg-transparent text-sm focus:outline-none"
                             value={item.description}
                             onChange={(e) => updateItem(idx, 'description', e.target.value)}
                           />
                         </div>
-                        <div className={hasCodeColumn && hasPricingColumns ? "col-span-1" : isFuel ? "col-span-3" : "col-span-2"}>
+                        <div className={hasCodeColumn && hasPricingColumns ? "col-span-1" : "col-span-2"}>
                           <div className="flex items-center gap-1 justify-center">
                             <input 
                               type="number"
@@ -496,21 +469,8 @@ export default function RequisitionForm({ onClose, onSubmit, userDept, userEmail
                               value={item.qty}
                               onChange={(e) => updateItem(idx, 'qty', parseFloat(e.target.value) || 0)}
                             />
-                            {isFuel && <span className="text-[10px] text-gray-400 font-bold">L</span>}
                           </div>
                         </div>
-                        {isFuel && (
-                          <div className="col-span-3">
-                            <select 
-                              className="w-full bg-transparent text-sm focus:outline-none font-bold text-right"
-                              value={item.fuelType || 'Diesel'}
-                              onChange={(e) => updateItem(idx, 'fuelType', e.target.value)}
-                            >
-                              <option value="Diesel">Diesel</option>
-                              <option value="Petrol">Petrol</option>
-                            </select>
-                          </div>
-                        )}
                         {hasPricingColumns && (
                           <>
                             <div className="col-span-2">

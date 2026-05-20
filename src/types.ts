@@ -12,7 +12,6 @@ export enum RequisitionType {
   IT = 'IT',
   CAR_MAINTENANCE = 'Car Maintenance',
   QUOTATIONS = 'Quotations',
-  FUEL = 'Fuel',
   FINANCE = 'Finance Requisition',
   MARKETING = 'Marketing',
   CASH = 'Cash Requisition'
@@ -32,8 +31,7 @@ export enum UserRole {
   SHOP_HOD = 'Shop Head of Department',
   IT_HOD = 'IT HOD',
   WAREHOUSE_HOD = 'Warehouse HOD',
-  TREASURER = 'Treasurer',
-  FUELER = 'Fueler'
+  TREASURER = 'Treasurer'
 }
 
 export enum Department {
@@ -50,8 +48,7 @@ export enum Department {
   AUDIT = 'Audit',
   FINANCE = 'Finance',
   ADMINISTRATION = 'Administration',
-  MARKETING = 'Marketing',
-  GARAGE = 'Garage'
+  MARKETING = 'Marketing'
 }
 
 export interface RequisitionItem {
@@ -211,9 +208,6 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
   ],
   [RequisitionType.CAR_MAINTENANCE]: [
     UserRole.DIRECTOR,
-    UserRole.FINANCE_HOD
-  ],
-  [RequisitionType.FUEL]: [
     UserRole.FINANCE_HOD
   ],
   [RequisitionType.FINANCE]: [

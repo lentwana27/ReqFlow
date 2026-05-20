@@ -356,7 +356,6 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
 
   const userRole = userProfile?.role as string;
   const isTreasurer = userRole === UserRole.TREASURER || userRole === 'Treasurer' || userRole === 'TREASURER';
-  const isFueler = userRole === UserRole.FUELER;
 
   const typesEligibleForReturn = [
     RequisitionType.ADMIN,
@@ -364,7 +363,6 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     RequisitionType.PURCHASING,
     RequisitionType.PROJECTS,
     RequisitionType.IT,
-    RequisitionType.FUEL,
     RequisitionType.MARKETING,
     RequisitionType.CASH
   ];
@@ -379,8 +377,6 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                            requisition.returnStatus === 'pending';
 
   const canProcess = isTreasurer && requisition.status === 'approved';
-  
-  const canCompleteFuel = isFueler && requisition.status === 'processed' && requisition.type === RequisitionType.FUEL;
 
   const currency = requisition.currency || Currency.USD;
   const symbol = currency === Currency.USD ? '$' : '';
@@ -470,10 +466,10 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
               {requisition.amountIssued !== undefined && requisition.amountIssued !== null && (
                 <div className="bg-green-50 p-2 border border-green-100 rounded-sm">
                   <label className="text-[9px] uppercase font-bold text-green-600 block">
-                    {requisition.type === RequisitionType.FUEL ? 'Fuel Issued (Litres)' : 'Amount Issued'}
+                    Amount Issued
                   </label>
                   <p className="text-sm font-bold text-green-800">
-                    {requisition.type === RequisitionType.FUEL ? `${requisition.amountIssued} L` : `${symbol}${requisition.amountIssued.toFixed(2)}${suffix}`}
+                    {symbol}{requisition.amountIssued.toFixed(2)}{suffix}
                   </p>
                 </div>
               )}
@@ -508,7 +504,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                     </label>
                   </div>
                   <p className={`text-xl font-black ${requisition.returnStatus === 'confirmed' ? 'text-green-800' : 'text-blue-900'}`}>
-                    {requisition.type === RequisitionType.FUEL ? `${requisition.amountToReturn} L` : `${symbol}${requisition.amountToReturn?.toFixed(2)}${suffix}`}
+                    {symbol}{requisition.amountToReturn?.toFixed(2)}{suffix}
                   </p>
                   {requisition.returnStatus === 'pending' && userProfile.role === UserRole.TREASURER && (
                     <p className="text-[10px] font-bold text-blue-700 mt-1 italic underline">TREASURER: PLEASE VERIFY AND CONFIRM RECEIPT BELOW</p>
@@ -561,9 +557,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                                       !(isTreasurer && isInternalInternal);
                 
                 const hasPricingColumns = requisition.type !== RequisitionType.SHOP_QR && 
-                                         requisition.type !== RequisitionType.WAREHOUSE_QR && 
-                                         requisition.type !== RequisitionType.FUEL;
-                const isFuel = requisition.type === RequisitionType.FUEL;
+                                         requisition.type !== RequisitionType.WAREHOUSE_QR;
                 
                 return (
                   <table className="w-full">
@@ -571,8 +565,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                       <tr className="font-mono text-[10px] uppercase text-gray-500">
                         {hasCodeColumn && <th className="text-left px-4 py-3">Code</th>}
                         <th className="text-left px-4 py-3">Description</th>
-                        <th className="text-center px-4 py-3">{isFuel ? 'Litres' : 'Qty'}</th>
-                        {isFuel && <th className="text-right px-4 py-3">Type</th>}
+                        <th className="text-center px-4 py-3">Qty</th>
                         {hasPricingColumns && (
                           <>
                             <th className="text-right px-4 py-3">Price</th>
@@ -586,8 +579,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                         <tr key={idx}>
                           {hasCodeColumn && <td className="px-4 py-3 font-mono text-blue-600 font-bold">{item.code || 'N/A'}</td>}
                           <td className="px-4 py-3">{item.description}</td>
-                          <td className="px-4 py-3 text-center">{item.qty}{isFuel ? ' L' : ''}</td>
-                          {isFuel && <td className="px-4 py-3 text-right font-bold">{item.fuelType || 'Diesel'}</td>}
+                          <td className="px-4 py-3 text-center">{item.qty}</td>
                           {hasPricingColumns && (
                             <>
                               <td className="px-4 py-3 text-right">{symbol}{item.unitCost.toFixed(2)}{suffix}</td>
@@ -877,49 +869,6 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                   <ArrowRight className="w-4 h-4" />
                 )}
                 {isProcessing === 'processed' ? 'Disbursing...' : isSuccess ? 'Processed!' : 'Disburse & Mark Processed'}
-              </button>
-            </div>
-          )}
-
-          {canCompleteFuel && (
-            <div className="space-y-4 pt-4 border-t border-gray-200">
-              <div className="bg-green-50 border border-green-100 p-4 rounded-sm">
-                <p className="text-xs text-green-700 font-medium flex items-center gap-2">
-                  <Check className="w-4 h-4" /> Fuel has been issued by Treasurer. Ready to complete.
-                </p>
-              </div>
-              <button 
-                onClick={async () => {
-                  try {
-                    setIsProcessing('processed');
-                    await requisitionService.update(requisition.id, {
-                      status: 'completed',
-                      updatedAt: new Date().toISOString()
-                    });
-                    setIsSuccess(true);
-                    showToast('Fuel Requisition marked as completed', 'success');
-                    setTimeout(() => {
-                      onClose();
-                    }, 1000);
-                  } catch (err) {
-                    showToast('Failed to complete requisition', 'error');
-                  } finally {
-                    setIsProcessing(null);
-                  }
-                }}
-                disabled={!!isProcessing || isSuccess}
-                className={`w-full btn-primary border-none flex items-center justify-center gap-2 h-12 transition-all duration-300 ${
-                  isSuccess ? 'bg-green-600' : 'bg-green-700 hover:bg-green-800'
-                } disabled:opacity-80 text-white`}
-              >
-                {isProcessing === 'processed' ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : isSuccess ? (
-                  <Check className="w-4 h-4" />
-                ) : (
-                  <Check className="w-4 h-4" />
-                )}
-                {isProcessing === 'processed' ? 'Completing...' : isSuccess ? 'Completed!' : 'Mark as Completed'}
               </button>
             </div>
           )}

@@ -198,8 +198,7 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
 
   const isQR = requisition.type === 'Shop QR' || requisition.type === 'Warehouse QR';
   const hasCodeColumn = (requisition.type === 'Warehouse' || requisition.type === 'Shop Use' || isQR || requisition.type === 'Quotations') && !(isTreasurer && isInternalInternal);
-  const hasPricingColumns = !isQR && requisition.type !== 'Fuel';
-  const isFuel = requisition.type === 'Fuel';
+  const hasPricingColumns = !isQR;
   const currency = requisition.currency || 'USD';
   const symbol = currency === 'USD' ? '$' : '';
   const suffix = currency !== 'USD' ? ` ${currency}` : '';
@@ -225,9 +224,7 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
         ? ['Code', 'Description', 'Quantity', 'Price', 'Total']
         : isQR 
           ? ['Code', 'Description', 'Quantity'] 
-          : isFuel 
-            ? ['Description', 'Litres', 'Type'] 
-            : ['Description', 'Quantity', 'Unit Cost', 'Total Cost']
+          : ['Description', 'Quantity', 'Unit Cost', 'Total Cost']
     ],
     body: requisition.items.map(item => {
       if (hasCodeColumn && hasPricingColumns) {
@@ -240,8 +237,6 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
         ];
       } else if (isQR) {
         return [item.code || 'N/A', item.description, item.qty];
-      } else if (isFuel) {
-        return [item.description, `${item.qty} L`, item.fuelType || 'Diesel'];
       } else {
         return [
           item.description,
@@ -358,11 +353,7 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
         doc.setFont('', 'bold');
         doc.text('Amount Issued:', 14, nextY + 25);
         doc.setFont('', 'normal');
-        if (isFuel) {
-          doc.text(`${requisition.amountIssued} L`, 45, nextY + 25);
-        } else {
-          doc.text(`${symbol}${requisition.amountIssued.toFixed(2)}${suffix}`, 45, nextY + 25);
-        }
+        doc.text(`${symbol}${requisition.amountIssued.toFixed(2)}${suffix}`, 45, nextY + 25);
       }
 
       // Financial Reconciliation for Treasurer/General Use
@@ -376,17 +367,17 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
         doc.setTextColor(0, 100, 0);
         doc.text(`${returnTypeLabel} RETURNED:`, 14, nextY + 31);
         doc.setFont('', 'normal');
-        doc.text(isFuel ? `${changeVal} L (CONFIRMED)` : `${symbol}${changeVal.toFixed(2)}${suffix} (CONFIRMED)`, 45, nextY + 31);
+        doc.text(`${symbol}${changeVal.toFixed(2)}${suffix} (CONFIRMED)`, 45, nextY + 31);
       } else if (changeVal > 0) {
         doc.setTextColor(isTreasurer ? 200 : 150, isTreasurer ? 0 : 100, 0);
         doc.text(`${returnTypeLabel} REMAINING:`, 14, nextY + 31);
         doc.setFont('', 'normal');
-        doc.text(isFuel ? `${changeVal} L${isPending ? ' (PENDING)' : ''}` : `${symbol}${changeVal.toFixed(2)}${suffix}${isPending ? ' (PENDING)' : ''}`, 45, nextY + 31);
+        doc.text(`${symbol}${changeVal.toFixed(2)}${suffix}${isPending ? ' (PENDING)' : ''}`, 45, nextY + 31);
       } else {
         doc.setTextColor(100, 100, 100);
         doc.text('BALANCE:', 14, nextY + 31);
         doc.setFont('', 'normal');
-        doc.text(isFuel ? `0 L (BALANCED)` : `${symbol}0.00${suffix} (BALANCED)`, 45, nextY + 31);
+        doc.text(`${symbol}0.00${suffix} (BALANCED)`, 45, nextY + 31);
       }
       doc.setTextColor(26, 26, 26);
 

@@ -479,9 +479,6 @@ export const requisitionService = {
         
         // Unverified users can ONLY see their own requisitions
         if (!userProfile.isVerified) return false;
-
-        const isFueler = userProfile.role === UserRole.FUELER;
-        if (isFueler && req.type === RequisitionType.FUEL && (req.status === 'approved' || req.status === 'processed' || req.status === 'completed')) return true;
         
         const isApproverInChain = req.approvals.some(approval => {
           if (approval.role === userProfile.role) return true;
@@ -823,7 +820,7 @@ export const notificationService = {
         
         // Treasurer only handles specific types
         if (proc.role === UserRole.TREASURER) {
-          const allowedTypes = [RequisitionType.ADMIN, RequisitionType.PURCHASING, RequisitionType.WORKSHOP, RequisitionType.FUEL, RequisitionType.FINANCE];
+          const allowedTypes = [RequisitionType.ADMIN, RequisitionType.PURCHASING, RequisitionType.WORKSHOP, RequisitionType.FINANCE];
           if (!allowedTypes.includes(requisition.type as any)) continue;
         }
 
