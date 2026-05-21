@@ -494,7 +494,8 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     RequisitionType.PROJECTS,
     RequisitionType.IT,
     RequisitionType.MARKETING,
-    RequisitionType.CASH
+    RequisitionType.CASH,
+    RequisitionType.CANTEEN
   ];
 
   const canRequestReturn = requisition.status === 'processed' && 

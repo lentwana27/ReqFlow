@@ -819,7 +819,7 @@ export const notificationService = {
         
         // Treasurer only handles specific types
         if (proc.role === UserRole.TREASURER) {
-          const allowedTypes = [RequisitionType.ADMIN, RequisitionType.PURCHASING, RequisitionType.WORKSHOP, RequisitionType.FINANCE];
+          const allowedTypes = [RequisitionType.ADMIN, RequisitionType.PURCHASING, RequisitionType.WORKSHOP, RequisitionType.FINANCE, RequisitionType.CANTEEN];
           if (!allowedTypes.includes(requisition.type as any)) continue;
         }
 

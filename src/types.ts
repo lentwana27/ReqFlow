@@ -14,7 +14,8 @@ export enum RequisitionType {
   QUOTATIONS = 'Quotations',
   FINANCE = 'Finance Requisition',
   MARKETING = 'Marketing',
-  CASH = 'Cash Requisition'
+  CASH = 'Cash Requisition',
+  CANTEEN = 'Canteen'
 }
 
 export enum UserRole {
@@ -182,8 +183,7 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
   ],
   [RequisitionType.WORKSHOP]: [
     UserRole.PURCHASING_HOD,
-    UserRole.FINANCE_HOD,
-    UserRole.DIRECTOR
+    UserRole.FINANCE_HOD
   ],
   [RequisitionType.PROJECTS]: [
     UserRole.PURCHASING_HOD,
@@ -224,6 +224,10 @@ export const REQUISITION_WORKFLOWS: Record<RequisitionType, string[]> = {
     UserRole.PURCHASING_HOD,
     UserRole.FINANCE_HOD,
     UserRole.DIRECTOR
+  ],
+  [RequisitionType.CANTEEN]: [
+    UserRole.FINANCE_HOD,
+    UserRole.TREASURER
   ]
 };
 

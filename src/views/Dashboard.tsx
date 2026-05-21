@@ -512,8 +512,8 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                 // For QR types, we show the first item's details in the table if filtered
                 const firstItem = req.items[0] || { code: '-', description: '-', qty: 0 };
 
-                // Extra check for Treasurer to see only Approved items in the list unless they are the creator or it has pending return
-                if (userProfile.role === UserRole.TREASURER && req.creatorId !== userProfile.uid && req.status !== 'approved' && req.status !== 'processed' && req.returnStatus !== 'pending') {
+                // Extra check for Treasurer to see only Approved items in the list unless they are the creator or it has pending return or they are an approver
+                if (userProfile.role === UserRole.TREASURER && !isApprover && req.creatorId !== userProfile.uid && req.status !== 'approved' && req.status !== 'processed' && req.returnStatus !== 'pending') {
                   return null;
                 }
 
