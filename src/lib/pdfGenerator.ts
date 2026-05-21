@@ -122,70 +122,70 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
   } else {
     // STANDARD INTERNAL REQUISITION INFO
     doc.setFont('', 'bold');
-    doc.text('Requisition Number:', 14, textStartY + 10);
+    doc.text('Requisition Number:', 14, textStartY + 8);
     doc.setFont('', 'normal');
-    doc.text(requisition.requisitionNumber, 55, textStartY + 10);
+    doc.text(requisition.requisitionNumber, 55, textStartY + 8);
 
     doc.setFont('', 'bold');
-    doc.text('Requisition Type:', 14, textStartY + 17);
+    doc.text('Requisition Type:', 14, textStartY + 14);
     doc.setFont('', 'normal');
-    doc.text(requisition.type || 'N/A', 55, textStartY + 17);
+    doc.text(requisition.type || 'N/A', 55, textStartY + 14);
 
     doc.setFont('', 'bold');
-    doc.text('Department:', 14, textStartY + 24);
+    doc.text('Department:', 14, textStartY + 20);
     doc.setFont('', 'normal');
-    doc.text(requisition.department, 55, textStartY + 24);
+    doc.text(requisition.department, 55, textStartY + 20);
 
     doc.setFont('', 'bold');
-    doc.text('Requested By:', 14, textStartY + 31);
+    doc.text('Requested By:', 14, textStartY + 26);
     doc.setFont('', 'normal');
-    doc.text(requisition.creatorName, 55, textStartY + 31);
+    doc.text(requisition.creatorName, 55, textStartY + 26);
 
     if (!isInternalInternal) {
       doc.setFont('', 'bold');
-      doc.text('Written To:', 14, textStartY + 38);
+      doc.text('Written To:', 14, textStartY + 32);
       doc.setFont('', 'normal');
-      doc.text(requisition.writtenTo || 'N/A', 55, textStartY + 38);
+      doc.text(requisition.writtenTo || 'N/A', 55, textStartY + 32);
     }
 
     doc.setFont('', 'bold');
-    doc.text('Date Created:', pageWidth - 80, textStartY + 10);
+    doc.text('Date Created:', pageWidth - 80, textStartY + 8);
     doc.setFont('', 'normal');
     const createdDate = requisition.createdAt ? (typeof requisition.createdAt === 'string' ? parseISO(requisition.createdAt) : (requisition.createdAt as any).toDate?.() || new Date(requisition.createdAt as any)) : new Date();
-    doc.text(format(createdDate, 'PPP p'), pageWidth - 45, textStartY + 10);
+    doc.text(format(createdDate, 'PPP p'), pageWidth - 45, textStartY + 8);
 
     doc.setFont('', 'bold');
-    doc.text('Status:', pageWidth - 80, textStartY + 17);
+    doc.text('Status:', pageWidth - 80, textStartY + 14);
     doc.setFont('', 'normal');
-    doc.text(requisition.status.toUpperCase(), pageWidth - 45, textStartY + 17);
+    doc.text(requisition.status.toUpperCase(), pageWidth - 45, textStartY + 14);
 
     if (requisition.processedNumber) {
       doc.setFont('', 'bold');
-      doc.text('Processed No:', pageWidth - 80, textStartY + 24);
+      doc.text('Processed No:', pageWidth - 80, textStartY + 20);
       doc.setFont('', 'normal');
-      doc.text(requisition.processedNumber, pageWidth - 45, textStartY + 24);
+      doc.text(requisition.processedNumber, pageWidth - 45, textStartY + 20);
     }
   }
 
   // Adjusted Y positions for rest of elements
-  const detailsEndY = textStartY + 45;
+  const detailsEndY = textStartY + 38;
 
   // Rejection Reason if it exists
   if (requisition.status === 'rejected' && requisition.rejectionReason) {
     doc.setFont('', 'bold');
     doc.setTextColor(200, 0, 0);
-    doc.text('REJECTION REASON:', 14, detailsEndY + 7);
+    doc.text('REJECTION REASON:', 14, detailsEndY + 5);
     doc.setFont('', 'normal');
     doc.setFontSize(9);
     const splitReason = doc.splitTextToSize(requisition.rejectionReason, pageWidth - 65);
-    doc.text(splitReason, 55, detailsEndY + 7);
+    doc.text(splitReason, 55, detailsEndY + 5);
     doc.setFontSize(10);
     doc.setTextColor(26, 26, 26);
   }
 
   // Notes if they exist
   if (requisition.notes) {
-    const notesY = (requisition.status === 'rejected' && requisition.rejectionReason) ? detailsEndY + 14 : detailsEndY + 7;
+    const notesY = (requisition.status === 'rejected' && requisition.rejectionReason) ? detailsEndY + 12 : detailsEndY + 5;
     doc.setFont('', 'bold');
     doc.text('Notes:', 14, notesY);
     doc.setFont('', 'normal');
@@ -204,17 +204,17 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
   const suffix = currency !== 'USD' ? ` ${currency}` : '';
 
   // Calculate table start Y dynamically
-  let tableStartY = 95;
+  let tableStartY = 75;
   if (requisition.notes) {
-    const notesY = (requisition.status === 'rejected' && requisition.rejectionReason) ? 87 : 80;
+    const notesY = (requisition.status === 'rejected' && requisition.rejectionReason) ? 75 : 70;
     const splitNotes = doc.splitTextToSize(requisition.notes, pageWidth - 65);
     tableStartY = notesY + (splitNotes.length * 5) + 5;
   } else if (requisition.status === 'rejected' && requisition.rejectionReason) {
     const splitReason = doc.splitTextToSize(requisition.rejectionReason, pageWidth - 65);
-    tableStartY = 80 + (splitReason.length * 5) + 5;
+    tableStartY = 70 + (splitReason.length * 5) + 5;
   }
   
-  if (tableStartY < 95) tableStartY = 95;
+  if (tableStartY < 75) tableStartY = 75;
 
   // Items Table
   autoTable(doc, {
@@ -256,7 +256,7 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
       `${symbol}${requisition.totalAmount.toFixed(2)}${suffix}`
     ].filter(v => v !== undefined)],
     footStyles: { fillColor: [245, 245, 245], textColor: [26, 26, 26], fontStyle: 'bold' },
-    styles: { fontSize: 9, cellPadding: 4 },
+    styles: { fontSize: requisition.items.length > 8 ? 7 : 8, cellPadding: requisition.items.length > 8 ? 2 : 3 },
   });
 
   // Approval History & Signatures (ONLY for Internal Requisitions)
@@ -298,16 +298,17 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
         '' // Placeholder for QR code
       ]),
       theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 3, valign: 'middle' },
+      styles: { fontSize: requisition.approvals.length > 5 ? 7 : 8, cellPadding: requisition.approvals.length > 5 ? 2 : 3, valign: 'middle' },
       headStyles: { fillColor: [240, 240, 240], textColor: [26, 26, 26], fontStyle: 'bold' },
       columnStyles: {
-        5: { cellWidth: 20, minCellHeight: 20 } // QR code column
+        5: { cellWidth: requisition.approvals.length > 5 ? 15 : 20, minCellHeight: requisition.approvals.length > 5 ? 15 : 20 } // QR code column
       },
       didDrawCell: (data) => {
         if (data.section === 'body' && data.column.index === 5) {
           const qr = approvalWithQR[data.row.index].qrDataUrl;
           if (qr) {
-            doc.addImage(qr, 'PNG', data.cell.x + 2, data.cell.y + 2, 16, 16);
+            const size = requisition.approvals.length > 5 ? 12 : 16;
+            doc.addImage(qr, 'PNG', data.cell.x + 1.5, data.cell.y + 1.5, size, size);
           }
         }
       },
@@ -315,45 +316,45 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
     
     // Disbursement Section (if exists)
     if (requisition.status === 'processed' && requisition.issuedInfo) {
-      let nextY = (doc as any).lastAutoTable.finalY + 15;
+      let nextY = (doc as any).lastAutoTable.finalY + 10;
       
       // Check for space
-      if (nextY + 45 > pageHeight - 20) {
+      if (nextY + 35 > pageHeight - 20) {
         doc.addPage();
         nextY = 20;
       }
 
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.setTextColor(0, 50, 150);
       doc.setFont('', 'bold');
       doc.text('DISBURSEMENT / ISSUANCE DETAILS', 14, nextY);
       
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.setTextColor(26, 26, 26);
       doc.setFont('', 'normal');
       
       const issuedDate = typeof requisition.issuedInfo.timestamp === 'string' ? parseISO(requisition.issuedInfo.timestamp) : new Date(requisition.issuedInfo.timestamp);
       
       doc.setFont('', 'bold');
-      doc.text('Issued By:', 14, nextY + 7);
+      doc.text('Issued By:', 14, nextY + 6);
       doc.setFont('', 'normal');
-      doc.text(requisition.issuedInfo.userName, 45, nextY + 7);
+      doc.text(requisition.issuedInfo.userName, 45, nextY + 6);
       
       doc.setFont('', 'bold');
-      doc.text('Issue Date:', 14, nextY + 13);
+      doc.text('Issue Date:', 14, nextY + 12);
       doc.setFont('', 'normal');
-      doc.text(format(issuedDate, 'PPP p'), 45, nextY + 13);
+      doc.text(format(issuedDate, 'PPP p'), 45, nextY + 12);
       
       doc.setFont('', 'bold');
-      doc.text('Signature ID:', 14, nextY + 19);
+      doc.text('Signature ID:', 14, nextY + 18);
       doc.setFont('', 'normal');
-      doc.text(requisition.issuedInfo.signatureId, 45, nextY + 19);
+      doc.text(requisition.issuedInfo.signatureId, 45, nextY + 18);
 
       if (requisition.amountIssued !== undefined && requisition.amountIssued !== null) {
         doc.setFont('', 'bold');
-        doc.text('Amount Issued:', 14, nextY + 25);
+        doc.text('Amount Issued:', 14, nextY + 24);
         doc.setFont('', 'normal');
-        doc.text(`${symbol}${requisition.amountIssued.toFixed(2)}${suffix}`, 45, nextY + 25);
+        doc.text(`${symbol}${requisition.amountIssued.toFixed(2)}${suffix}`, 45, nextY + 24);
       }
 
       // Financial Reconciliation for Treasurer/General Use
@@ -365,41 +366,41 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
       const returnTypeLabel = requisition.returnType === 'funds' ? 'FUNDS' : 'CHANGE';
       if (isConfirmed) {
         doc.setTextColor(0, 100, 0);
-        doc.text(`${returnTypeLabel} RETURNED:`, 14, nextY + 31);
+        doc.text(`${returnTypeLabel} RETURNED:`, 14, nextY + 30);
         doc.setFont('', 'normal');
-        doc.text(`${symbol}${changeVal.toFixed(2)}${suffix} (CONFIRMED)`, 45, nextY + 31);
+        doc.text(`${symbol}${changeVal.toFixed(2)}${suffix} (CONFIRMED)`, 45, nextY + 30);
       } else if (changeVal > 0) {
         doc.setTextColor(isTreasurer ? 200 : 150, isTreasurer ? 0 : 100, 0);
-        doc.text(`${returnTypeLabel} REMAINING:`, 14, nextY + 31);
+        doc.text(`${returnTypeLabel} REMAINING:`, 14, nextY + 30);
         doc.setFont('', 'normal');
-        doc.text(`${symbol}${changeVal.toFixed(2)}${suffix}${isPending ? ' (PENDING)' : ''}`, 45, nextY + 31);
+        doc.text(`${symbol}${changeVal.toFixed(2)}${suffix}${isPending ? ' (PENDING)' : ''}`, 45, nextY + 30);
       } else {
         doc.setTextColor(100, 100, 100);
-        doc.text('BALANCE:', 14, nextY + 31);
+        doc.text('BALANCE:', 14, nextY + 30);
         doc.setFont('', 'normal');
-        doc.text(`${symbol}0.00${suffix} (BALANCED)`, 45, nextY + 31);
+        doc.text(`${symbol}0.00${suffix} (BALANCED)`, 45, nextY + 30);
       }
       doc.setTextColor(26, 26, 26);
 
       // QR Code for Issuance
       const verifyUrl = `${getPublicOrigin()}/?verify=${requisition.issuedInfo.signatureId}&reqId=${requisition.id}`;
       const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 100 });
-      doc.addImage(qrDataUrl, 'PNG', pageWidth - 45, nextY + 2, 25, 25);
-      doc.setFontSize(7);
+      doc.addImage(qrDataUrl, 'PNG', pageWidth - 45, nextY + 2, 22, 22);
+      doc.setFontSize(6);
       doc.setTextColor(150, 150, 150);
-      doc.text('Scan to verify disbursement', pageWidth - 32.5, nextY + 29, { align: 'center' });
+      doc.text('Scan to verify disbursement', pageWidth - 34, nextY + 26, { align: 'center' });
     }
   }
 
   // Add a line for the receiver to sign
-  let signatureY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 30 : 200;
+  let signatureY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 20 : 180;
   if (requisition.status === 'processed' && requisition.issuedInfo) {
-    signatureY += 35; // push it further down if disbursement section is present
+    signatureY += 32; // push it further down if disbursement section is present
   }
   
-  if (signatureY + 30 > pageHeight - 30) {
+  if (signatureY + 20 > pageHeight - 15) {
     doc.addPage();
-    signatureY = 40;
+    signatureY = 30;
   }
 
   doc.setDrawColor(150, 150, 150);
@@ -407,12 +408,12 @@ export const generateRequisitionPDF = async (requisition: Requisition, userRole?
   doc.line(14, signatureY, 80, signatureY);
   
   doc.setFont('', 'normal');
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(26, 26, 26);
-  doc.text('Receiver (Name & Signature)', 14, signatureY + 5);
+  doc.text('Receiver (Name & Signature)', 14, signatureY + 4);
 
   doc.line(pageWidth - 80, signatureY, pageWidth - 14, signatureY);
-  doc.text('Date', pageWidth - 80, signatureY + 5);
+  doc.text('Date', pageWidth - 80, signatureY + 4);
 
   // Footer / Verification note
   doc.setFontSize(8);
