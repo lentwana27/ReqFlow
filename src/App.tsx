@@ -88,7 +88,7 @@ function AppContent() {
     localStorage.setItem(SESSION_CACHE_KEY, '1');
     setUserProfile(user);
     // If logging in as admin, default to admin panel
-    if (user.username === 'admin') {
+    if (user.username === 'admin' || user.username === 'admin1') {
       setCurrentView('admin');
     } else {
       setCurrentView('dashboard');

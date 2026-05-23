@@ -11,7 +11,7 @@ interface NavbarProps {
 
 export default function Navbar({ userProfile, currentView, onViewChange, onLogout, onOpenSettings }: NavbarProps) {
   const isSuperAdmin = userProfile && 
-    (userProfile.username === 'admin' || (userProfile.isVerified && [UserRole.ADMIN, UserRole.DIRECTOR].includes(userProfile.role)));
+    (userProfile.username === 'admin' || userProfile.username === 'admin1' || (userProfile.isVerified && [UserRole.ADMIN, UserRole.DIRECTOR].includes(userProfile.role)));
 
   return (
     <nav className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-50">

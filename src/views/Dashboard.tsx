@@ -327,7 +327,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       exit={{ opacity: 0 }}
       className="space-y-8"
     >
-      {!userProfile.isVerified && userProfile.username !== 'admin' && (
+      {!userProfile.isVerified && userProfile.username !== 'admin' && userProfile.username !== 'admin1' && (
         <div className="bg-amber-100 border-l-4 border-amber-500 p-4 rounded-sm flex items-center gap-4">
           <Clock className="w-6 h-6 text-amber-600 shrink-0" />
           <div className="flex-1">

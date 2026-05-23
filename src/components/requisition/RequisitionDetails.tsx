@@ -39,7 +39,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
   // Silent repair for involvedRoles on old requisitions
   useEffect(() => {
     const repairInvolvedRoles = async () => {
-      const isSystemAdmin = userProfile.username === 'admin' || userProfile.role === UserRole.ADMIN;
+      const isSystemAdmin = userProfile.username === 'admin' || userProfile.username === 'admin1' || userProfile.role === UserRole.ADMIN;
       const isCurrentlyInvolved = requisition.involvedRoles?.includes(userProfile.role);
       
       if (!(isSystemAdmin || isCurrentlyInvolved)) return;
@@ -209,8 +209,8 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
   };
 
   const canDelete = () => {
-    // Only the general system administrator (username: 'admin') can force delete any requisition
-    if (userProfile.username === 'admin') return true;
+    // Only the general system administrator (username: 'admin' or 'admin1') can force delete any requisition
+    if (userProfile.username === 'admin' || userProfile.username === 'admin1') return true;
 
     // Audit System Administrators (ADMIN role) can view all requisitions but NOT delete them
     if (userProfile.role === UserRole.ADMIN) return false;
@@ -253,6 +253,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     // Admin, Treasurer, Director, and Finance HOD can always download
     if (
       userProfile.username === 'admin' || 
+      userProfile.username === 'admin1' || 
       userProfile.role === UserRole.ADMIN || 
       userProfile.role === UserRole.TREASURER ||
       userProfile.role === UserRole.DIRECTOR ||
@@ -290,7 +291,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
     if (!currentApproval) return false;
 
     // Block unverified users from approving
-    if (!userProfile.isVerified && userProfile.username !== 'admin') return false;
+    if (!userProfile.isVerified && userProfile.username !== 'admin' && userProfile.username !== 'admin1') return false;
 
     if (checkRoleMatch(userProfile, currentApproval.role, requisition.department)) return true;
 
@@ -543,7 +544,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {!userProfile.isVerified && userProfile.username !== 'admin' && checkRoleMatch(userProfile, requisition.approvals[requisition.currentStage]?.role || '', requisition.department) && (
+            {!userProfile.isVerified && userProfile.username !== 'admin' && userProfile.username !== 'admin1' && checkRoleMatch(userProfile, requisition.approvals[requisition.currentStage]?.role || '', requisition.department) && (
               <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 rounded-sm text-[10px] font-bold border border-amber-100 mr-4">
                 <AlertCircle className="w-3 h-3" />
                 VERIFICATION REQUIRED
@@ -1007,7 +1008,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
             </div>
           )}
 
-          {!userProfile.isVerified && userProfile.username !== 'admin' && requisition.status === 'pending' && checkRoleMatch(userProfile, requisition.approvals[requisition.currentStage]?.role || '', requisition.department) && !canApprove() && (
+          {!userProfile.isVerified && userProfile.username !== 'admin' && userProfile.username !== 'admin1' && requisition.status === 'pending' && checkRoleMatch(userProfile, requisition.approvals[requisition.currentStage]?.role || '', requisition.department) && !canApprove() && (
              <div className="p-6 bg-amber-50 border border-amber-200 rounded-sm flex flex-col items-center text-center gap-3">
                 <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center text-amber-600">
                   <Lock className="w-5 h-5" />

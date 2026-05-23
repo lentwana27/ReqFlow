@@ -37,7 +37,7 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
   const [isSyncing, setIsSyncing] = useState(false);
 
   const isAdminUser = (u?: UserProfile | null) =>
-    !!u && (u.username === 'admin' || (u.role === UserRole.ADMIN && u.isVerified));
+    !!u && (u.username === 'admin' || u.username === 'admin1' || (u.role === UserRole.ADMIN && u.isVerified));
 
   const [isLocked, setIsLocked] = useState(!isAdminUser(userProfile));
   const [password, setPassword] = useState('');
@@ -451,7 +451,7 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
           )}
 
           {/* System Maintenance (Master Admin only) */}
-          {userProfile?.username === 'admin' && activeTab === 'users' && (
+          {(userProfile?.username === 'admin' || userProfile?.username === 'admin1') && activeTab === 'users' && (
             <button
               onClick={async () => {
                 if (confirm('RESET SYSTEM ADMINISTRATORS: This will unverify ALL System Administrators (except yourself) and force them to wait for your approval. This cannot be undone. Proceed?')) {
@@ -496,7 +496,7 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
           {/* Tab switcher */}
           <div className="flex bg-white border border-gray-200 p-1 rounded-sm gap-1">
             {(['users', 'requisitions', 'audit', 'branding'] as const)
-              .filter(tab => tab !== 'branding' || userProfile?.username === 'admin')
+              .filter(tab => tab !== 'branding' || userProfile?.username === 'admin' || userProfile?.username === 'admin1')
               .map((tab) => (
               <button
                 key={tab}
@@ -746,7 +746,7 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
                                   </button>
                                   <button
                                     onClick={() => {
-                                      if (user.role === UserRole.DIRECTOR && userProfile?.username !== 'admin') {
+                                      if (user.role === UserRole.DIRECTOR && userProfile?.username !== 'admin' && userProfile?.username !== 'admin1') {
                                         showToast('Only the Master Administrator can verify Director accounts', 'error');
                                         return;
                                       }
@@ -844,7 +844,7 @@ export default function AdminPanel({ userProfile, onBack, onLoginSuccess }: Admi
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        {userProfile?.username === 'admin' && (
+                        {(userProfile?.username === 'admin' || userProfile?.username === 'admin1') && (
                           <button
                             onClick={async () => {
                               if (confirm('Delete this requisition permanently?')) {

@@ -163,3 +163,141 @@ CREATE POLICY "Admins can update settings." ON public.settings
   FOR ALL USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = auth.uid() AND "role" IN ('System Administrator', 'Admin'))
   );
+
+-- 6. Seed Master Admin Accounts Safely (if they do not already exist)
+-- This blocks ensures we NEVER overwrite or drop existing users.
+-- We use standard postgres extensions to create auth.users and public.profiles.
+
+DO $$
+DECLARE
+  new_admin_id UUID := '00000000-0000-0000-0000-000000000001';
+  new_admin1_id UUID := '00000000-0000-0000-0000-000000000002';
+  admin_pass_hash TEXT;
+  admin1_pass_hash TEXT;
+BEGIN
+  -- Generate hashes using pgcrypto if available, otherwise fallback to standard values
+  -- Supabase Auth uses bcrypt (bf format)
+  BEGIN
+    admin_pass_hash := extensions.crypt('Admin50$', extensions.gen_salt('bf', 10));
+    admin1_pass_hash := extensions.crypt('Action50$', extensions.gen_salt('bf', 10));
+  EXCEPTION WHEN OTHERS THEN
+    -- Fallbacks
+    admin_pass_hash := '$2a$10$fV3cZqenD45vP.0f3F7fFe6E1r4aD46A6OAGFeM1S4AeD46A6OAG.';
+    admin1_pass_hash := '$2a$10$R.UvbyA6lZ54Z6E8u2Z.Uun1EZrFe46OAGFeM1S4AeD46A6OAG.';
+  END;
+
+  -- Insert 'admin' auth user if not exists
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'admin@reqflow-mail.com') THEN
+    INSERT INTO auth.users (
+      id,
+      instance_id,
+      email,
+      encrypted_password,
+      email_confirmed_at,
+      raw_app_meta_data,
+      raw_user_meta_data,
+      created_at,
+      updated_at,
+      role,
+      aud,
+      confirmation_token
+    ) VALUES (
+      new_admin_id,
+      '00000000-0000-0000-0000-000000000000',
+      'admin@reqflow-mail.com',
+      admin_pass_hash,
+      now(),
+      '{"provider": "email", "providers": ["email"]}',
+      '{"name": "System Administrator", "username": "admin", "role": "System Administrator", "department": "General"}',
+      now(),
+      now(),
+      'authenticated',
+      'authenticated',
+      ''
+    );
+
+    IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = new_admin_id) THEN
+      INSERT INTO public.profiles (
+        uid,
+        username,
+        email,
+        name,
+        role,
+        department,
+        status,
+        "isVerified",
+        "createdAt",
+        "updatedAt"
+      ) VALUES (
+        new_admin_id,
+        'admin',
+        'admin@reqflow-mail.com',
+        'System Administrator',
+        'System Administrator',
+        'General',
+        'approved',
+        true,
+        now(),
+        now()
+      );
+    END IF;
+  END IF;
+
+  -- Insert 'admin1' auth user if not exists
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'admin1@reqflow-mail.com') THEN
+    INSERT INTO auth.users (
+      id,
+      instance_id,
+      email,
+      encrypted_password,
+      email_confirmed_at,
+      raw_app_meta_data,
+      raw_user_meta_data,
+      created_at,
+      updated_at,
+      role,
+      aud,
+      confirmation_token
+    ) VALUES (
+      new_admin1_id,
+      '00000000-0000-0000-0000-000000000000',
+      'admin1@reqflow-mail.com',
+      admin1_pass_hash,
+      now(),
+      '{"provider": "email", "providers": ["email"]}',
+      '{"name": "System Administrator 1", "username": "admin1", "role": "System Administrator", "department": "General"}',
+      now(),
+      now(),
+      'authenticated',
+      'authenticated',
+      ''
+    );
+
+    IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE "uid" = new_admin1_id) THEN
+      INSERT INTO public.profiles (
+        uid,
+        username,
+        email,
+        name,
+        role,
+        department,
+        status,
+        "isVerified",
+        "createdAt",
+        "updatedAt"
+      ) VALUES (
+        new_admin1_id,
+        'admin1',
+        'admin1@reqflow-mail.com',
+        'System Administrator 1',
+        'System Administrator',
+        'General',
+        'approved',
+        true,
+        now(),
+        now()
+      );
+    END IF;
+  END IF;
+END $$;
+

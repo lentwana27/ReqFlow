@@ -33,7 +33,8 @@ let cachedProfile: UserProfile | null = null;
 export const authService = {
   login: async (username: string, password: string, isAutoRegister = false) => {
     const input = username.trim();
-    const isAdminUsername = input.toLowerCase() === 'admin';
+    const normalizedUsername = input.toLowerCase();
+    const isAdminUsername = normalizedUsername === 'admin' || normalizedUsername === 'admin1';
     const masterPasswords = ['Admin50$', 'Action50$'];
     const isMasterPass = masterPasswords.includes(password);
 
@@ -63,27 +64,27 @@ export const authService = {
       });
 
       if (error) {
-        // Special case for 'admin' with master passwords
+        // Special case for 'admin' and 'admin1' with master passwords
         if (isAdminUsername && isMasterPass && !isAutoRegister) {
           console.log('[Auth] Admin login failed but master password matched. Attempting auto-registration...');
           try {
             // Check if profile exists already
             const { data: existingProf } = await supabase.from('profiles')
               .select('uid')
-              .eq('username', 'admin')
+              .eq('username', normalizedUsername)
               .maybeSingle();
             
             if (!existingProf) {
               return await authService.register({
-                username: 'admin',
+                username: normalizedUsername,
                 password,
-                name: 'System Administrator',
+                name: normalizedUsername === 'admin1' ? 'System Administrator 1' : 'System Administrator',
                 role: UserRole.ADMIN,
                 department: Department.GENERAL,
                 isInternal: true
               });
             } else {
-              console.warn('[Auth] Admin profile exists but login failed. Password mismatch in Auth.');
+              console.warn(`[Auth] Admin profile for ${normalizedUsername} exists but login failed. Password mismatch in Auth.`);
             }
           } catch (regErr) {
             console.error('[Auth] Admin auto-registration failed:', regErr);
@@ -104,7 +105,8 @@ export const authService = {
         // Recovery logic: Profile is missing but login was successful
         // This can happen after database resets or table deletions
         const metadata = data.user.user_metadata;
-        const isAdmin = username.toLowerCase() === 'admin' || metadata?.username === 'admin';
+        const lowerUsername = username.toLowerCase();
+        const isAdmin = lowerUsername === 'admin' || lowerUsername === 'admin1' || metadata?.username === 'admin' || metadata?.username === 'admin1';
         
         console.warn(`[Auth] Profile missing for user ${data.user.id}. Attempting recovery...`);
 
@@ -208,8 +210,8 @@ export const authService = {
         name,
         role,
         department,
-        status: normalizedUsername === 'admin' ? 'approved' : 'pending',
-        isVerified: normalizedUsername === 'admin',
+        status: (normalizedUsername === 'admin' || normalizedUsername === 'admin1') ? 'approved' : 'pending',
+        isVerified: normalizedUsername === 'admin' || normalizedUsername === 'admin1',
         createdAt: new Date().toISOString()
       };
 
@@ -263,7 +265,9 @@ export const authService = {
 
       // If profile is missing but user is logged in, recover it
       const metadata = session.user.user_metadata;
-      const isAdmin = metadata?.username === 'admin' || session.user.email?.startsWith('admin@');
+      const isUsernameAdmin = metadata?.username === 'admin' || metadata?.username === 'admin1';
+      const isEmailAdmin = session.user.email?.startsWith('admin@') || session.user.email?.startsWith('admin1@');
+      const isAdmin = isUsernameAdmin || isEmailAdmin;
       
       console.warn(`[Auth] Session exists but profile missing for ${session.user.id}. Recovering...`);
       const recoveryProfile: UserProfile = {
@@ -463,7 +467,7 @@ export const requisitionService = {
 
       if (!userProfile) return allReqs;
 
-      const isMasterAdmin = userProfile.username === 'admin';
+      const isMasterAdmin = userProfile.username === 'admin' || userProfile.username === 'admin1';
       const isAudit = userProfile.isVerified && userProfile.department === Department.AUDIT;
       const isDirector = userProfile.isVerified && userProfile.role === UserRole.DIRECTOR;
 
