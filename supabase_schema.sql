@@ -94,7 +94,7 @@ ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "rejectionReason" TEXT;
 ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "quotationBook" TEXT;
 ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "issuedInfo" JSONB;
 
--- Speed Optimizations (Makes user log in, verification, and loading tables significantly faster)
+-- Speed Optimizations & Performance Patch (Makes user log in, verification, and loading tables significantly faster)
 CREATE INDEX IF NOT EXISTS idx_profiles_username ON public.profiles(username);
 CREATE INDEX IF NOT EXISTS idx_requisitions_creator_id ON public.requisitions("creatorId");
 CREATE INDEX IF NOT EXISTS idx_requisitions_status ON public.requisitions(status);
@@ -102,6 +102,42 @@ CREATE INDEX IF NOT EXISTS idx_requisitions_return_status ON public.requisitions
 CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON public.activity_logs("userId");
 CREATE INDEX IF NOT EXISTS idx_activity_logs_requisition_id ON public.activity_logs("requisitionId");
 CREATE INDEX IF NOT EXISTS idx_activity_logs_timestamp ON public.activity_logs("timestamp");
+
+-- ── 1. AUTH / LOGIN SPEEDUP ──
+-- Composite indexes for lightning fast profile lookup on active profile status checks
+CREATE INDEX IF NOT EXISTS idx_profiles_uid_status ON public.profiles ("uid", "status", "isVerified");
+-- Lowercase username logins (prevents table scans on case-insensitive logins)
+CREATE INDEX IF NOT EXISTS idx_profiles_username_lower ON public.profiles (LOWER("username"));
+
+-- ── 2. REQUISITIONS TABLE QUERY OPTIMIZATIONS ──
+-- Compound index covering most dashboard lists filtering by creator and status
+CREATE INDEX IF NOT EXISTS idx_req_creator_status ON public.requisitions ("creatorId", "status");
+-- Role-based inbox queries: GIN index allows fast array containment checks for involvedRoles matching
+CREATE INDEX IF NOT EXISTS idx_req_involved_roles ON public.requisitions USING GIN ("involvedRoles");
+-- Filtered partial index for active return workflows only
+CREATE INDEX IF NOT EXISTS idx_req_return_status_filtered ON public.requisitions ("returnStatus") WHERE "returnStatus" != 'none';
+-- Absolute order query performance improvement (newest first)
+CREATE INDEX IF NOT EXISTS idx_req_created_desc ON public.requisitions ("createdAt" DESC);
+-- Partial index covering active, non-historical requisitions only
+CREATE INDEX IF NOT EXISTS idx_req_active_only ON public.requisitions ("creatorId", "currentStage") WHERE "status" IN ('pending', 'approved');
+
+-- ── 3. ACTIVITY LOGS SPEEDUP ──
+-- Highly optimized indexes covering matching by user/requisition with desc ordering (keeps recent queries fast)
+CREATE INDEX IF NOT EXISTS idx_logs_recent_by_user ON public.activity_logs ("userId", "timestamp" DESC);
+CREATE INDEX IF NOT EXISTS idx_logs_recent_by_req ON public.activity_logs ("requisitionId", "timestamp" DESC);
+-- Module filters for audit tables
+CREATE INDEX IF NOT EXISTS idx_logs_module_timestamp ON public.activity_logs ("module", "timestamp" DESC);
+
+-- ── 4. COLD DATA ARCHIVE STRUCTURE ──
+-- Create background storage for historical activity logs if database size increases (Safe & Isolated)
+CREATE TABLE IF NOT EXISTS public.activity_logs_archive (
+  LIKE public.activity_logs INCLUDING ALL
+);
+
+-- ── 5. RUN ANALYZE ON MODIFIED TABLES (Tells Postgres query planner to refresh stats) ──
+ANALYZE public.profiles;
+ANALYZE public.requisitions;
+ANALYZE public.activity_logs;
 
 -- RLS (Row Level Security)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
