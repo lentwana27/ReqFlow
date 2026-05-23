@@ -147,6 +147,11 @@ export const authService = {
 
         cachedProfile = recoveryProfile;
         await localDb.users.put(recoveryProfile);
+        try {
+          localStorage.setItem('reqflow_user_profile', JSON.stringify(recoveryProfile));
+        } catch (e) {
+          console.warn('[Cache] Failed to write recovery profile to localStorage:', e);
+        }
         return { user: recoveryProfile };
       }
 
@@ -162,6 +167,11 @@ export const authService = {
       
       // Update local cache
       await localDb.users.put(cachedProfile);
+      try {
+        localStorage.setItem('reqflow_user_profile', JSON.stringify(cachedProfile));
+      } catch (e) {
+        console.warn('[Cache] Failed to write user profile to localStorage:', e);
+      }
       
       return { user: cachedProfile };
     } catch (error: any) {
@@ -244,6 +254,11 @@ export const authService = {
       
       cachedProfile = profile;
       await localDb.users.put(profile);
+      try {
+        localStorage.setItem('reqflow_user_profile', JSON.stringify(profile));
+      } catch (e) {
+        console.warn('[Cache] Failed to write registered profile to localStorage:', e);
+      }
       
       return { user: profile };
     } catch (error: any) {
@@ -981,8 +996,8 @@ MINEAZY REQFLOW System
       if (requisition.status === 'processed') {
         const { data: creatorProfile } = await supabase.from('profiles').select('email, name').eq('uid', requisition.creatorId).maybeSingle();
         if (creatorProfile?.email) {
-          const changeText = requisition.changeReturned && requisition.changeReturned > 0 
-            ? `\nCHANGE TO BE RETURNED: ${requisition.currency || '$'}${requisition.changeReturned.toFixed(2)}\nPlease return this amount to the office promptly.\n`
+          const changeText = requisition.changeReturned !== undefined && requisition.changeReturned !== null && requisition.changeReturned > 0 
+            ? `\nCHANGE TO BE RETURNED: ${requisition.currency || '$'}{(Number(requisition.changeReturned) || 0).toFixed(2)}\nPlease return this amount to the office promptly.\n`
             : '';
             
           console.log(`[Notification] Sending processed notice to ${creatorProfile.email}...`);

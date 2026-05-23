@@ -24,14 +24,21 @@ export default function App() {
 const SESSION_CACHE_KEY = 'reqflow_has_session';
 
 function AppContent() {
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
+    try {
+      const stored = localStorage.getItem('reqflow_user_profile');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
   const [currentView, setCurrentView] = useState<'dashboard' | 'audit' | 'admin'>('dashboard');
   const [verifyParams, setVerifyParams] = useState<{ id: string; signatureId: string } | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // ─── Loading state ─────────────────────────────────────────────────────────
   const hasCachedSession = localStorage.getItem(SESSION_CACHE_KEY) === '1';
-  const [loading, setLoading] = useState(!hasCachedSession);
+  const [loading, setLoading] = useState(!userProfile && !hasCachedSession);
   const authResolved = useRef(false);
 
   // ─── Deep link capturing ───────────────────────────────────────────────────
@@ -63,8 +70,14 @@ function AppContent() {
         const profile = await authService.getCurrentUser();
         if (isMounted) {
           setUserProfile(profile);
-          if (profile) localStorage.setItem(SESSION_CACHE_KEY, '1');
-          else localStorage.removeItem(SESSION_CACHE_KEY);
+          if (profile) {
+            localStorage.setItem(SESSION_CACHE_KEY, '1');
+            localStorage.setItem('reqflow_user_profile', JSON.stringify(profile));
+          } else {
+            localStorage.removeItem(SESSION_CACHE_KEY);
+            localStorage.removeItem('reqflow_user_profile');
+            localStorage.removeItem('reqflow_cached_requisitions');
+          }
         }
       } catch (err) {
         console.error('Initial auth check failed:', err);
@@ -86,6 +99,7 @@ function AppContent() {
   // ─── Handlers ──────────────────────────────────────────────────────────────
   const handleLoginSuccess = (user: UserProfile) => {
     localStorage.setItem(SESSION_CACHE_KEY, '1');
+    localStorage.setItem('reqflow_user_profile', JSON.stringify(user));
     setUserProfile(user);
     // If logging in as admin, default to admin panel
     if (user.username === 'admin' || user.username === 'admin1') {
@@ -97,6 +111,8 @@ function AppContent() {
 
   const handleLogout = async () => {
     localStorage.removeItem(SESSION_CACHE_KEY);
+    localStorage.removeItem('reqflow_user_profile');
+    localStorage.removeItem('reqflow_cached_requisitions');
     await authService.logout();
     setUserProfile(null);
     setCurrentView('dashboard');

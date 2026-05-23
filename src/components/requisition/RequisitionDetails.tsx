@@ -605,7 +605,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                   </p>
                 </div>
               )}
-              {requisition.changeReturned !== undefined && requisition.changeReturned > 0 && (requisition.returnStatus === 'none' || !requisition.returnStatus) && (
+              {requisition.changeReturned !== undefined && requisition.changeReturned !== null && requisition.changeReturned > 0 && (requisition.returnStatus === 'none' || !requisition.returnStatus) && (
                 <div className={`p-4 border rounded-sm transition-all duration-500 bg-amber-100 border-amber-400 animate-pulse shadow-md ring-2 ring-amber-500/20`}>
                   <div className="flex items-center gap-2 mb-1">
                     <Clock className="w-4 h-4 text-amber-700" />
@@ -614,7 +614,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                     </label>
                   </div>
                   <p className="text-xl font-black text-amber-900">
-                    {symbol}{requisition.changeReturned.toFixed(2)}{suffix}
+                    {symbol}{(Number(requisition.changeReturned) || 0).toFixed(2)}{suffix}
                   </p>
                   <p className="text-[10px] font-bold text-amber-700 mt-1 italic">
                     {requisition.creatorId === userProfile.uid ? '!!! ACTION REQUIRED: RETURN THIS CHANGE TO THE OFFICE !!!' : 'Waiting for creator to return funds'}
@@ -630,7 +630,7 @@ export default function RequisitionDetails({ requisition, userProfile, onClose, 
                     </label>
                   </div>
                   <p className={`text-xl font-black ${requisition.returnStatus === 'confirmed' ? 'text-green-800' : 'text-blue-900'}`}>
-                    {symbol}{requisition.amountToReturn?.toFixed(2)}{suffix}
+                    {symbol}{requisition.amountToReturn != null ? requisition.amountToReturn.toFixed(2) : '0.00'}{suffix}
                   </p>
                   {requisition.returnStatus === 'pending' && userProfile.role === UserRole.TREASURER && (
                     <p className="text-[10px] font-bold text-blue-700 mt-1 italic underline">TREASURER: PLEASE VERIFY AND CONFIRM RECEIPT BELOW</p>

@@ -16,13 +16,20 @@ interface DashboardProps {
 
 export default function Dashboard({ userProfile }: DashboardProps) {
   const { showToast } = useToast();
-  const [requisitions, setRequisitions] = useState<Requisition[]>([]);
+  const [requisitions, setRequisitions] = useState<Requisition[]>(() => {
+    try {
+      const stored = localStorage.getItem('reqflow_cached_requisitions');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [showForm, setShowForm] = useState(false);
   const [showTypeSelector, setShowTypeSelector] = useState(false);
   const [selectedType, setSelectedType] = useState<RequisitionType | null>(null);
   const [editingReq, setEditingReq] = useState<Requisition | null>(null);
   const [selectedReq, setSelectedReq] = useState<Requisition | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(requisitions.length === 0);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
@@ -43,6 +50,11 @@ export default function Dashboard({ userProfile }: DashboardProps) {
 
         if (isMounted) {
           setRequisitions(localData);
+          try {
+            localStorage.setItem('reqflow_cached_requisitions', JSON.stringify(localData));
+          } catch (e) {
+            console.warn('[Cache] Failed to write requisitions to localStorage:', e);
+          }
           setLoading(false);
           
           // Auto-switch to Action tab if there are items needing approval
@@ -560,14 +572,14 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                             {req.totalAmount.toFixed(2)}
                             {req.currency && req.currency !== Currency.USD ? ` ${req.currency}` : ''}
                           </span>
-                          {req.status === 'processed' && req.amountIssued !== undefined && (
+                          {req.status === 'processed' && req.amountIssued !== undefined && req.amountIssued !== null && (
                             <span className="text-[10px] text-green-600 mt-1">
-                              Issued: {req.currency === Currency.USD || !req.currency ? '$' : ''}{req.amountIssued.toFixed(2)}{req.currency && req.currency !== Currency.USD ? ` ${req.currency}` : ''}
+                              Issued: {req.currency === Currency.USD || !req.currency ? '$' : ''}{(Number(req.amountIssued) || 0).toFixed(2)}{req.currency && req.currency !== Currency.USD ? ` ${req.currency}` : ''}
                             </span>
                           )}
-                          {(req.amountToReturn && req.amountToReturn > 0) || (req.changeReturned && req.changeReturned > 0) ? (
+                          {(req.amountToReturn !== undefined && req.amountToReturn !== null && req.amountToReturn > 0) || (req.changeReturned !== undefined && req.changeReturned !== null && req.changeReturned > 0) ? (
                             <span className={`text-[10px] mt-0.5 px-1 rounded-sm ${req.returnStatus === 'confirmed' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-                              {req.returnStatus === 'confirmed' ? 'Returned' : 'Owing'}: {req.currency === Currency.USD || !req.currency ? '$' : ''}{(req.amountToReturn || req.changeReturned || 0).toFixed(2)}{req.currency && req.currency !== Currency.USD ? ` ${req.currency}` : ''}
+                              {req.returnStatus === 'confirmed' ? 'Returned' : 'Owing'}: {req.currency === Currency.USD || !req.currency ? '$' : ''}{(Number(req.amountToReturn || req.changeReturned) || 0).toFixed(2)}{req.currency && req.currency !== Currency.USD ? ` ${req.currency}` : ''}
                             </span>
                           ) : null}
                         </div>
@@ -609,9 +621,9 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                             {req.processedNumber}
                           </span>
                         )}
-                        {(req.changeReturned && req.changeReturned > 0) && (
+                        {req.changeReturned !== undefined && req.changeReturned !== null && req.changeReturned > 0 && (
                           <span className={`text-[9px] font-bold px-1 border rounded-sm ${req.returnStatus === 'confirmed' ? 'text-green-700 bg-green-50 border-green-100' : 'text-amber-700 bg-amber-50 border-amber-100'}`}>
-                            Balance: {req.currency === Currency.USD || !req.currency ? '$' : ''}{req.changeReturned.toFixed(2)}
+                            Balance: {req.currency === Currency.USD || !req.currency ? '$' : ''}{(Number(req.changeReturned) || 0).toFixed(2)}
                           </span>
                         )}
                       </div>
@@ -784,7 +796,14 @@ export default function Dashboard({ userProfile }: DashboardProps) {
             onClose={() => {
                 setSelectedReq(null);
                 // Refresh list on close in case of updates
-                requisitionService.list(userProfile).then(setRequisitions);
+                requisitionService.list(userProfile).then(res => {
+                  setRequisitions(res);
+                  try {
+                    localStorage.setItem('reqflow_cached_requisitions', JSON.stringify(res));
+                  } catch (e) {
+                     console.warn('[Cache] Failed to write refreshed list to localStorage:', e);
+                  }
+                });
             }}
           />
         )}
