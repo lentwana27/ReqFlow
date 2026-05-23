@@ -1,6 +1,6 @@
 -- Supabase Schema for REQFLOW PRO - Production Update Only
 -- Run this in the Supabase SQL Editor
--- This file uses IF NOT EXISTS to prevent accidental data loss.
+-- This file uses IF NOT EXISTS to prevent accidental data loss. It never drops tables or deletes existing user data.
 
 -- 1. Profiles Table (Linked to auth.users)
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -20,12 +20,12 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 CREATE TABLE IF NOT EXISTS public.requisitions (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "requisitionNumber" TEXT NOT NULL,
-  "sequenceNumber" TEXT, -- Added
-  "processedNumber" TEXT, -- Added
-  "amountIssued" NUMERIC, -- Added: Actual amount issued by Treasurer
-  "changeReturned" NUMERIC, -- Added: Amount to be returned if issued > total
-  "amountToReturn" NUMERIC, -- Added: Amount user wants to return
-  "returnStatus" TEXT DEFAULT 'none', -- Added: none, pending, confirmed
+  "sequenceNumber" TEXT,
+  "processedNumber" TEXT,
+  "amountIssued" NUMERIC, -- Actual amount issued by Treasurer
+  "changeReturned" NUMERIC, -- Amount to be returned if issued > total
+  "amountToReturn" NUMERIC, -- Amount user wants to return
+  "returnStatus" TEXT DEFAULT 'none', -- none, pending, confirmed
   "type" TEXT NOT NULL,
   "creatorId" UUID REFERENCES public.profiles("uid") ON DELETE CASCADE NOT NULL,
   "creatorName" TEXT NOT NULL,
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS public.activity_logs (
   "details" TEXT,
   "requisitionId" UUID REFERENCES public.requisitions("id") ON DELETE CASCADE,
   "userId" UUID REFERENCES public.profiles("uid") ON DELETE CASCADE,
-  "department" TEXT -- Added
+  "department" TEXT
 );
 
 -- 4. Settings Table
@@ -78,6 +78,30 @@ CREATE TABLE IF NOT EXISTS public.recovery_tokens (
   "expiresAt" TIMESTAMPTZ NOT NULL,
   "createdAt" TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Incremental Schema Upgrades (Upgrades existing schemas in-place without deleting any data)
+ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "sequenceNumber" TEXT;
+ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "processedNumber" TEXT;
+ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "amountIssued" NUMERIC;
+ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "changeReturned" NUMERIC;
+ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "amountToReturn" NUMERIC;
+ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "returnStatus" TEXT DEFAULT 'none';
+ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "returnType" TEXT;
+ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "currency" TEXT DEFAULT 'USD';
+ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "attachments" JSONB DEFAULT '[]';
+ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "notes" TEXT;
+ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "rejectionReason" TEXT;
+ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "quotationBook" TEXT;
+ALTER TABLE public.requisitions ADD COLUMN IF NOT EXISTS "issuedInfo" JSONB;
+
+-- Speed Optimizations (Makes user log in, verification, and loading tables significantly faster)
+CREATE INDEX IF NOT EXISTS idx_profiles_username ON public.profiles(username);
+CREATE INDEX IF NOT EXISTS idx_requisitions_creator_id ON public.requisitions("creatorId");
+CREATE INDEX IF NOT EXISTS idx_requisitions_status ON public.requisitions(status);
+CREATE INDEX IF NOT EXISTS idx_requisitions_return_status ON public.requisitions("returnStatus");
+CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON public.activity_logs("userId");
+CREATE INDEX IF NOT EXISTS idx_activity_logs_requisition_id ON public.activity_logs("requisitionId");
+CREATE INDEX IF NOT EXISTS idx_activity_logs_timestamp ON public.activity_logs("timestamp");
 
 -- RLS (Row Level Security)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -165,7 +189,7 @@ CREATE POLICY "Admins can update settings." ON public.settings
   );
 
 -- 6. Seed Master Admin Accounts Safely (if they do not already exist)
--- This blocks ensures we NEVER overwrite or drop existing users.
+-- This block ensures we NEVER overwrite or drop existing users.
 -- We use standard postgres extensions to create auth.users and public.profiles.
 
 DO $$
@@ -300,4 +324,3 @@ BEGIN
     END IF;
   END IF;
 END $$;
-

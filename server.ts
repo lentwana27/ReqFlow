@@ -80,11 +80,43 @@ app.post('/api/admin/reset-password', async (req, res) => {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    let { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       password: newPassword
     });
 
-    if (error) throw error;
+    if (error) {
+      const errMessage = error.message || '';
+      if (errMessage.toLowerCase().includes('user not found') || errMessage.toLowerCase().includes('not found') || error.status === 404) {
+        console.log(`[Admin Auth] User ${userId} not found in Auth. Attempting to recreate...`);
+        const isUser1 = userId === '00000000-0000-0000-0000-000000000001';
+        const isUser2 = userId === '00000000-0000-0000-0000-000000000002';
+        
+        if (isUser1 || isUser2) {
+          const username = isUser2 ? 'admin1' : 'admin';
+          const email = `${username}@reqflow-mail.com`;
+          
+          const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+            id: userId,
+            email,
+            password: newPassword,
+            email_confirm: true,
+            user_metadata: {
+              name: username === 'admin1' ? 'System Administrator 1' : 'System Administrator',
+              username,
+              role: 'System Administrator',
+              department: 'General'
+            }
+          });
+          
+          if (createError) throw createError;
+          console.log(`[Admin Auth] User ${username} successfully recreated with ID ${userId}`);
+        } else {
+          throw error;
+        }
+      } else {
+        throw error;
+      }
+    }
 
     console.log(`[Admin Auth] Password successfully reset for user: ${userId}`);
     res.json({ success: true, message: 'Password updated successfully' });

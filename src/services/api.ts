@@ -84,7 +84,23 @@ export const authService = {
                 isInternal: true
               });
             } else {
-              console.warn(`[Auth] Admin profile for ${normalizedUsername} exists but login failed. Password mismatch in Auth.`);
+              console.warn(`[Auth] Admin profile for ${normalizedUsername} exists but login failed. Password mismatch in Auth. Syncing Auth password with master...`);
+              try {
+                const response = await fetch('/api/admin/reset-password', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ userId: existingProf.uid, newPassword: password })
+                });
+                
+                if (response.ok) {
+                  console.log('[Auth] Auth password synced successfully. Retrying login...');
+                  return await authService.login(username, password, true);
+                } else {
+                  console.error('[Auth] Failed to sync auth password:', await response.text());
+                }
+              } catch (syncErr) {
+                console.error('[Auth] Sync error:', syncErr);
+              }
             }
           } catch (regErr) {
             console.error('[Auth] Admin auto-registration failed:', regErr);
