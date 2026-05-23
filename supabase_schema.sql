@@ -121,6 +121,15 @@ CREATE INDEX IF NOT EXISTS idx_req_created_desc ON public.requisitions ("created
 -- Partial index covering active, non-historical requisitions only
 CREATE INDEX IF NOT EXISTS idx_req_active_only ON public.requisitions ("creatorId", "currentStage") WHERE "status" IN ('pending', 'approved');
 
+-- Covers the most common list query: WHERE creatorId = X ORDER BY createdAt DESC (Postgres skips sort)
+CREATE INDEX IF NOT EXISTS idx_req_list_user ON public.requisitions ("creatorId", "createdAt" DESC);
+-- Covers admin view: all reqs ordered by newest first
+CREATE INDEX IF NOT EXISTS idx_req_list_admin ON public.requisitions ("createdAt" DESC, "status");
+-- Covers status filter tab (Pending / Approved / Rejected / Processed)
+CREATE INDEX IF NOT EXISTS idx_req_list_status_date ON public.requisitions ("status", "createdAt" DESC);
+-- Covers the return queue (returnStatus = 'pending' is rare so extremely fast)
+CREATE INDEX IF NOT EXISTS idx_req_list_return ON public.requisitions ("returnStatus", "createdAt" DESC) WHERE "returnStatus" = 'pending';
+
 -- ── 3. ACTIVITY LOGS SPEEDUP ──
 -- Highly optimized indexes covering matching by user/requisition with desc ordering (keeps recent queries fast)
 CREATE INDEX IF NOT EXISTS idx_logs_recent_by_user ON public.activity_logs ("userId", "timestamp" DESC);

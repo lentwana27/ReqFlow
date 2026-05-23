@@ -473,86 +473,107 @@ export const userService = {
 export const requisitionService = {
   list: async (userProfile?: UserProfile | null) => {
     try {
-      const { data, error } = await supabase
-        .from('requisitions')
-        .select('*')
-        .order('createdAt', { ascending: false });
-        
-      if (error) throw error;
-      const allReqs = data as Requisition[];
+      // 1. Gather all cached requisitions from local localDb
+      const cachedLocal = await localDb.requisitions.toArray();
+      
+      // Sort desc by createdAt
+      cachedLocal.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-      if (!userProfile) return allReqs;
+      const filterReqs = (reqs: Requisition[]) => {
+        if (!userProfile) return reqs;
 
-      const isMasterAdmin = userProfile.username === 'admin' || userProfile.username === 'admin1';
-      const isAudit = userProfile.isVerified && userProfile.department === Department.AUDIT;
-      const isDirector = userProfile.isVerified && userProfile.role === UserRole.DIRECTOR;
+        const isMasterAdmin = userProfile.username === 'admin' || userProfile.username === 'admin1';
+        const isAudit = userProfile.isVerified && userProfile.department === Department.AUDIT;
+        const isDirector = userProfile.isVerified && userProfile.role === UserRole.DIRECTOR;
 
-      if (isMasterAdmin || isAudit || isDirector) return allReqs;
+        if (isMasterAdmin || isAudit || isDirector) return reqs;
 
-      // Expand list logic:
-      // 1. You created it
-      // 2. You are in the approval chain AND you are verified
-      // 3. You are a "Processor" (Finance HOD / Treasurer) AND you are verified and it is approved
-      return allReqs.filter(req => {
-        if (req.creatorId === userProfile.uid) return true;
-        
-        // Unverified users can ONLY see their own requisitions
-        if (!userProfile.isVerified) return false;
-        
-        const isApproverInChain = req.approvals.some(approval => {
-          if (approval.role === userProfile.role) return true;
+        return reqs.filter(req => {
+          if (req.creatorId === userProfile.uid) return true;
           
-          // Role alias/HOD matching logic
-          if (approval.role === UserRole.HOD) {
-            if (req.department === Department.IT && userProfile.role === UserRole.IT_HOD) return true;
-            if (req.department === Department.WAREHOUSE && userProfile.role === UserRole.WAREHOUSE_HOD) return true;
-            if (req.department === Department.PURCHASING && userProfile.role === UserRole.PURCHASING_HOD) return true;
-            if (req.department === Department.SHOP && userProfile.role === UserRole.SHOP_HOD) return true;
-            if (userProfile.role === UserRole.HOD && userProfile.department === req.department) return true;
-          }
+          // Unverified users can ONLY see their own requisitions
+          if (!userProfile.isVerified) return false;
           
-          if (approval.role === UserRole.IT_HOD) {
-            if (userProfile.role === UserRole.HOD && userProfile.department === Department.IT) return true;
-          }
+          const isApproverInChain = req.approvals.some(approval => {
+            if (approval.role === userProfile.role) return true;
+            
+            // Role alias/HOD matching logic
+            if (approval.role === UserRole.HOD) {
+              if (req.department === Department.IT && userProfile.role === UserRole.IT_HOD) return true;
+              if (req.department === Department.WAREHOUSE && userProfile.role === UserRole.WAREHOUSE_HOD) return true;
+              if (req.department === Department.PURCHASING && userProfile.role === UserRole.PURCHASING_HOD) return true;
+              if (req.department === Department.SHOP && userProfile.role === UserRole.SHOP_HOD) return true;
+              if (userProfile.role === UserRole.HOD && userProfile.department === req.department) return true;
+            }
+            
+            if (approval.role === UserRole.IT_HOD) {
+              if (userProfile.role === UserRole.HOD && userProfile.department === Department.IT) return true;
+            }
+            
+            if (approval.role === UserRole.WAREHOUSE_HOD) {
+              if (userProfile.role === UserRole.HOD && userProfile.department === Department.WAREHOUSE) return true;
+            }
+
+            if (approval.role === UserRole.PURCHASING_HOD) {
+              if (userProfile.role === UserRole.HOD && userProfile.department === Department.PURCHASING) return true;
+            }
+
+            if (approval.role === UserRole.SHOP_HOD) {
+              if (userProfile.role === UserRole.HOD && userProfile.department === Department.SHOP) return true;
+            }
+            
+            return false;
+          });
+          if (isApproverInChain) return true;
+
+          const isFinanceOrTreasurer = userProfile.role === UserRole.FINANCE_HOD || userProfile.role === UserRole.TREASURER;
+          const isApprovedOrProcessed = req.status === 'approved' || req.status === 'processed';
           
-          if (approval.role === UserRole.WAREHOUSE_HOD) {
-            if (userProfile.role === UserRole.HOD && userProfile.department === Department.WAREHOUSE) return true;
+          if (isFinanceOrTreasurer && isApprovedOrProcessed) {
+            // If Treasurer, hide internal non-monetary types
+            if (userProfile.role === UserRole.TREASURER) {
+              const internalTypes = [RequisitionType.WAREHOUSE, RequisitionType.SHOP_USE, RequisitionType.SHOP_QR, RequisitionType.WAREHOUSE_QR];
+              if (internalTypes.includes(req.type as any)) return false;
+            }
+            return true;
           }
 
-          if (approval.role === UserRole.PURCHASING_HOD) {
-            if (userProfile.role === UserRole.HOD && userProfile.department === Department.PURCHASING) return true;
+          // Treasurer also sees items with pending fund returns
+          if (userProfile.role === UserRole.TREASURER && req.returnStatus === 'pending') {
+            return true;
           }
 
-          if (approval.role === UserRole.SHOP_HOD) {
-            if (userProfile.role === UserRole.HOD && userProfile.department === Department.SHOP) return true;
-          }
-          
+          // Past requisitions (processed) are only visible to creators and high-privilege users (handled by early return above)
+          if (req.status === 'processed' && req.returnStatus !== 'pending' && req.returnStatus !== 'confirmed') return false;
+
           return false;
         });
-        if (isApproverInChain) return true;
+      };
 
-        const isFinanceOrTreasurer = userProfile.role === UserRole.FINANCE_HOD || userProfile.role === UserRole.TREASURER;
-        const isApprovedOrProcessed = req.status === 'approved' || req.status === 'processed';
+      // 2. Fetcher to get latest from Supabase and sync localDb
+      const fetchAndSync = async () => {
+        const { data, error } = await supabase
+          .from('requisitions')
+          .select('*')
+          .order('createdAt', { ascending: false });
+          
+        if (error) throw error;
         
-        if (isFinanceOrTreasurer && isApprovedOrProcessed) {
-          // If Treasurer, hide internal non-monetary types
-          if (userProfile.role === UserRole.TREASURER) {
-            const internalTypes = [RequisitionType.WAREHOUSE, RequisitionType.SHOP_USE, RequisitionType.SHOP_QR, RequisitionType.WAREHOUSE_QR];
-            if (internalTypes.includes(req.type as any)) return false;
-          }
-          return true;
-        }
+        const freshReqs = data as Requisition[];
+        await localDb.requisitions.clear();
+        await localDb.requisitions.bulkPut(freshReqs);
+        return freshReqs;
+      };
 
-        // Treasurer also sees items with pending fund returns
-        if (userProfile.role === UserRole.TREASURER && req.returnStatus === 'pending') {
-          return true;
-        }
+      // If we have cached copies, trigger background update but return cache instantly!
+      if (cachedLocal.length > 0) {
+        fetchAndSync().catch(e => console.warn('[Cache] Background requisitions sync failed:', e));
+        return filterReqs(cachedLocal);
+      }
 
-        // Past requisitions (processed) are only visible to creators and high-privilege users (handled by early return above)
-        if (req.status === 'processed' && req.returnStatus !== 'pending' && req.returnStatus !== 'confirmed') return false;
-
-        return false;
-      });
+      // No cache exists yet. Fetch directly and block. On success, it is cached for all future hits!
+      const freshData = await fetchAndSync();
+      return filterReqs(freshData);
     } catch (error) {
       console.error('List requisitions error:', error);
       throw error;
@@ -560,6 +581,23 @@ export const requisitionService = {
   },
   getById: async (id: string) => {
     try {
+      // Return immediately if in local IndexedDB
+      const cached = await localDb.requisitions.get(id);
+      if (cached) {
+        // Run a background fetch to ensure it is up to date, but return cache instantly
+        (async () => {
+          try {
+            const { data } = await supabase.from('requisitions').select('*').eq('id', id).maybeSingle();
+            if (data) {
+              await localDb.requisitions.put(data as Requisition);
+            }
+          } catch (e) {
+            console.warn('[Cache] Background single requisition update failed:', e);
+          }
+        })();
+        return cached;
+      }
+
       const { data, error } = await supabase
         .from('requisitions')
         .select('*')
@@ -568,7 +606,10 @@ export const requisitionService = {
         
       if (error) throw error;
       if (!data) throw new Error(`Requisition with ID ${id} not found.`);
-      return data as Requisition;
+      
+      const req = data as Requisition;
+      await localDb.requisitions.put(req).catch(e => console.warn('[Cache] Failed to write to local DB:', e));
+      return req;
     } catch (error) {
       console.error('Get requisition error:', error);
       throw error;
@@ -691,6 +732,9 @@ export const requisitionService = {
 
       const requisition = data[0] as Requisition;
       
+      // Update local cache
+      await localDb.requisitions.put(requisition).catch(e => console.warn('[Cache] Write failed during create:', e));
+      
       // Notify next approver (Stage 0)
       notificationService.notifyNextApprover(requisition).catch(console.error);
       
@@ -770,6 +814,9 @@ export const requisitionService = {
       // Merge updates back into the returned data to ensure ephemeral fields (like rejectionReason) 
       // are available for notifications even if they weren't saved to the DB due to schema mismatches
       const requisition = { ...data[0], ...updates } as Requisition;
+      
+      // Update local cache
+      await localDb.requisitions.put(requisition).catch(e => console.warn('[Cache] Write failed during update:', e));
 
       // If progress happened or status changed to pending, notify next
       // Also notify if status is rejected
